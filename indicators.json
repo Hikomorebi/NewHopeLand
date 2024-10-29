@@ -1,0 +1,201 @@
+{
+      "basis_indicators": [
+    {
+      "category": "营销指标",
+      "indicator_field_name": "newsignunits",
+      "indicator_name": "新增签约套数",
+      "indicator_alias": "",
+      "unit": "套",
+      "summary_dimensions": [
+        "城市",
+        "项目",
+        "分期",
+        "业态",
+        "楼栋"
+      ],
+      "derived_indicators": [
+        "日",
+        "周",
+        "月",
+        "季",
+        "年"
+      ],
+      "data_source": "fdc_dwd.dwd_trade_roomsign_a_min",
+      "calculation_rule": "select count(1) as newsignunits from fdc_dwd.dwd_trade_roomsign_a_min where partitiondate = current_date and signexecdate between '${startdate}' and '${enddate}' and closedate > '${enddate}'",
+      "rule_description": ""
+    },
+    {
+      "category": "营销指标",
+      "indicator_field_name": "newsignarea",
+      "indicator_name": "新增签约面积",
+      "indicator_alias": "",
+      "unit": "㎡",
+      "summary_dimensions": [
+        "城市",
+        "项目",
+        "分期",
+        "业态",
+        "楼栋"
+      ],
+      "derived_indicators": [
+        "日",
+        "周",
+        "月",
+        "季",
+        "年"
+      ],
+      "data_source": "fdc_dwd.dwd_trade_roomsign_a_min",
+      "calculation_rule": "select sum(archArea) as newsignarea from fdc_dwd.dwd_trade_roomsign_a_min where partitiondate = current_date and signexecdate between '${startdate}' and '${enddate}'and closedate > '${enddate}'",
+      "rule_description": ""
+    },
+    {
+      "category": "营销指标",
+      "indicator_field_name": "newsignamount",
+      "indicator_name": "新增签约金额",
+      "indicator_alias": "",
+      "unit": "元",
+      "summary_dimensions": [
+        "城市",
+        "项目",
+        "分期",
+        "业态",
+        "楼栋"
+      ],
+      "derived_indicators": [
+        "权益前/后"
+      ],
+      "data_source": "fdc_dwd.dwd_trade_roomsign_a_min",
+      "calculation_rule": "select sum(nvl(contrtotalprice, 0) + nvl(firstdecoraterenosum, 0) + (case when fitmentpriceiscontr = '0' then nvl(decoratetotalprice, 0) else 0 end)) as newsignamount from fdc_dwd.dwd_trade_roomsign_a_min where partitiondate = current_date and signexecdate between '${startdate}' and '${enddate}' and closedate > '${enddate}'",
+      "rule_description": ""
+    },
+    {
+      "category": "营销指标",
+      "indicator_field_name": "signunits",
+      "indicator_name": "签约套数",
+      "indicator_alias": "已售套数",
+      "unit": "套",
+      "summary_dimensions": [
+        "城市",
+        "项目",
+        "分期",
+        "业态",
+        "楼栋"
+      ],
+      "derived_indicators": [
+        "日",
+        "周",
+        "月",
+        "季",
+        "年",
+        "累计"
+      ],
+      "data_source": "fdc_dws.dws_proj_room_totalsale_a_min",
+      "calculation_rule": "select rt_c.sign_units - rt_b.sign_units as signunits from fdc_dws.dws_proj_room_totalsale_a_min rt_c left join fdc_dws.dws_proj_room_totalsale_a_min rt_b on rt_c.datadate = '${basedate}' and rt_c.roomcode = rt_b.roomcode where rt_b.datadate = '${currentdate}'",
+      "rule_description": "当期的总签约-基期的总签约，取差值为期间的签约"
+    },
+    {
+      "category": "营销指标",
+      "indicator_field_name": "signarea",
+      "indicator_name": "签约面积",
+      "indicator_alias": "已售面积",
+      "unit": "㎡",
+      "summary_dimensions": [
+        "城市",
+        "项目",
+        "分期",
+        "业态",
+        "楼栋"
+      ],
+      "derived_indicators": [
+        "日",
+        "周",
+        "月",
+        "季",
+        "年",
+        "累计"
+      ],
+      "data_source": "fdc_dws.dws_proj_room_totalsale_a_min",
+      "calculation_rule": "select rt_c.sign_area - rt_b.sign_area as signarea from fdc_dws.dws_proj_room_totalsale_a_min rt_c left join fdc_dws.dws_proj_room_totalsale_a_min rt_b on rt_c.datadate = '${currentdate}' and rt_c.roomcode = rt_b.roomcode where rt_b.datadate = '${basedate}'",
+      "rule_description": "当期的总签约-基期的总签约，取差值为期间的签约"
+    },
+    {
+      "category": "营销指标",
+      "indicator_field_name": "signamount",
+      "indicator_name": "签约金额",
+      "indicator_alias": "已售金额/已售货值",
+      "unit": "元",
+      "summary_dimensions": [
+        "城市",
+        "项目",
+        "分期",
+        "业态",
+        "楼栋"
+      ],
+      "derived_indicators": [
+        "权益前/后"
+      ],
+      "data_source": "fdc_dws.dws_proj_room_totalsale_a_min",
+      "calculation_rule": "select rt_c.sign_amt - rt_b.sign_amt as signamount from fdc_dws.dws_proj_room_totalsale_a_min rt_c left join fdc_dws.dws_proj_room_totalsale_a_min rt_b on rt_c.datadate = '${currentdate}' and rt_c.roomcode = rt_b.roomcode where rt_b.datadate = '${basedate}'",
+      "rule_description": "当期的总签约-基期的总签约，取差值为期间的签约"
+    }
+  ],
+
+     "derived_indicators": [
+    {
+      "type": "周期",
+      "indicator_name": "日",
+      "prefix": "cd_",
+      "suffix": "",
+      "description": ""
+    },
+    {
+      "type": "周期",
+      "indicator_name": "周",
+      "prefix": "cw_",
+      "suffix": "",
+      "description": ""
+    },
+    {
+      "type": "周期",
+      "indicator_name": "月",
+      "prefix": "cm_",
+      "suffix": "",
+      "description": ""
+    },
+    {
+      "type": "周期",
+      "indicator_name": "季",
+      "prefix": "cq_",
+      "suffix": "",
+      "description": ""
+    },
+    {
+      "type": "周期",
+      "indicator_name": "年",
+      "prefix": "cy_",
+      "suffix": "",
+      "description": ""
+    },
+    {
+      "type": "周期",
+      "indicator_name": "累计",
+      "prefix": "ad_",
+      "suffix": "",
+      "description": ""
+    },
+    {
+      "type": "权益",
+      "indicator_name": "权益前",
+      "prefix": "",
+      "suffix": "_qyq",
+      "description": ""
+    },
+    {
+      "type": "权益",
+      "indicator_name": "权益后",
+      "prefix": "",
+      "suffix": "_qyh",
+      "description": "通过fdc_ads.view_proj_equity_his的有效日期计算权益后数据：权益前数据*对应的权益比例"
+    }
+  ]
+}
