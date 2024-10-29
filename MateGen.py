@@ -251,7 +251,7 @@ class MateGen:
                 # 返回的是匹配的基础指标
                 # 将完整的指标信息提供给大模型
                 for indicator in result:
-                    self.messages.messages_append({"role": "system", "content": json.dumps(indicator)})
+                    self.messages.messages_append({"role": "user", "content": json.dumps(indicator)})
             else:
                 # 返回的是干预问题的SQL
                 return_dict_sql_exec = sql_exec(result)

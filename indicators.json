@@ -21,7 +21,7 @@
         "年"
       ],
       "data_source": "fdc_dwd.dwd_trade_roomsign_a_min",
-      "calculation_rule": "select count(1) as newsignunits from fdc_dwd.dwd_trade_roomsign_a_min where partitiondate = current_date and signexecdate between '${startdate}' and '${enddate}' and closedate > '${enddate}'",
+      "calculation_rule": "select count(1) as newsignunits,sum(archArea) as newsignarea,sum(nvl(contrtotalprice, 0) + nvl(firstdecoraterenosum, 0) + (case when fitmentpriceiscontr = '0' then nvl(decoratetotalprice, 0) else 0 end)) as newsignamount from fdc_dwd.dwd_trade_roomsign_a_min where partitiondate = current_date and signexecdate between '${startdate}' and '${enddate}' and closedate > '${enddate}'",
       "rule_description": ""
     },
     {
@@ -45,7 +45,7 @@
         "年"
       ],
       "data_source": "fdc_dwd.dwd_trade_roomsign_a_min",
-      "calculation_rule": "select sum(archArea) as newsignarea from fdc_dwd.dwd_trade_roomsign_a_min where partitiondate = current_date and signexecdate between '${startdate}' and '${enddate}'and closedate > '${enddate}'",
+      "calculation_rule": "select count(1) as newsignunits,sum(archArea) as newsignarea,sum(nvl(contrtotalprice, 0) + nvl(firstdecoraterenosum, 0) + (case when fitmentpriceiscontr = '0' then nvl(decoratetotalprice, 0) else 0 end)) as newsignamount from fdc_dwd.dwd_trade_roomsign_a_min where partitiondate = current_date and signexecdate between '${startdate}' and '${enddate}'and closedate > '${enddate}'",
       "rule_description": ""
     },
     {
@@ -65,7 +65,7 @@
         "权益前/后"
       ],
       "data_source": "fdc_dwd.dwd_trade_roomsign_a_min",
-      "calculation_rule": "select sum(nvl(contrtotalprice, 0) + nvl(firstdecoraterenosum, 0) + (case when fitmentpriceiscontr = '0' then nvl(decoratetotalprice, 0) else 0 end)) as newsignamount from fdc_dwd.dwd_trade_roomsign_a_min where partitiondate = current_date and signexecdate between '${startdate}' and '${enddate}' and closedate > '${enddate}'",
+      "calculation_rule": "select count(1) as newsignunits,sum(archArea) as newsignarea,sum(nvl(contrtotalprice, 0) + nvl(firstdecoraterenosum, 0) + (case when fitmentpriceiscontr = '0' then nvl(decoratetotalprice, 0) else 0 end)) as newsignamount from fdc_dwd.dwd_trade_roomsign_a_min where partitiondate = current_date and signexecdate between '${startdate}' and '${enddate}' and closedate > '${enddate}'",
       "rule_description": ""
     },
     {
@@ -90,7 +90,7 @@
         "累计"
       ],
       "data_source": "fdc_dws.dws_proj_room_totalsale_a_min",
-      "calculation_rule": "select rt_c.sign_units - rt_b.sign_units as signunits from fdc_dws.dws_proj_room_totalsale_a_min rt_c left join fdc_dws.dws_proj_room_totalsale_a_min rt_b on rt_c.datadate = '${basedate}' and rt_c.roomcode = rt_b.roomcode where rt_b.datadate = '${currentdate}'",
+      "calculation_rule": "select rt_c.sign_units - rt_b.sign_units as signunits ,rt_c.sign_area - rt_b.sign_area as signarea,rt_c.sign_amt - rt_b.sign_amt as signamount from fdc_dws.dws_proj_room_totalsale_a_min rt_c left join fdc_dws.dws_proj_room_totalsale_a_min rt_b on rt_c.datadate = '${basedate}' and rt_c.roomcode = rt_b.roomcode where rt_b.datadate = '${currentdate}'",
       "rule_description": "当期的总签约-基期的总签约，取差值为期间的签约"
     },
     {
@@ -115,7 +115,7 @@
         "累计"
       ],
       "data_source": "fdc_dws.dws_proj_room_totalsale_a_min",
-      "calculation_rule": "select rt_c.sign_area - rt_b.sign_area as signarea from fdc_dws.dws_proj_room_totalsale_a_min rt_c left join fdc_dws.dws_proj_room_totalsale_a_min rt_b on rt_c.datadate = '${currentdate}' and rt_c.roomcode = rt_b.roomcode where rt_b.datadate = '${basedate}'",
+      "calculation_rule": "select rt_c.sign_units - rt_b.sign_units as signunits ,rt_c.sign_area - rt_b.sign_area as signarea, rt_c.sign_amt - rt_b.sign_amt as signamount from fdc_dws.dws_proj_room_totalsale_a_min rt_c left join fdc_dws.dws_proj_room_totalsale_a_min rt_b on rt_c.datadate = '${currentdate}' and rt_c.roomcode = rt_b.roomcode where rt_b.datadate = '${basedate}'",
       "rule_description": "当期的总签约-基期的总签约，取差值为期间的签约"
     },
     {
@@ -135,7 +135,7 @@
         "权益前/后"
       ],
       "data_source": "fdc_dws.dws_proj_room_totalsale_a_min",
-      "calculation_rule": "select rt_c.sign_amt - rt_b.sign_amt as signamount from fdc_dws.dws_proj_room_totalsale_a_min rt_c left join fdc_dws.dws_proj_room_totalsale_a_min rt_b on rt_c.datadate = '${currentdate}' and rt_c.roomcode = rt_b.roomcode where rt_b.datadate = '${basedate}'",
+      "calculation_rule": "select rt_c.sign_units - rt_b.sign_units as signunits ,rt_c.sign_area - rt_b.sign_area as signarea, rt_c.sign_amt - rt_b.sign_amt as signamount from fdc_dws.dws_proj_room_totalsale_a_min rt_c left join fdc_dws.dws_proj_room_totalsale_a_min rt_b on rt_c.datadate = '${currentdate}' and rt_c.roomcode = rt_b.roomcode where rt_b.datadate = '${basedate}'",
       "rule_description": "当期的总签约-基期的总签约，取差值为期间的签约"
     }
   ],

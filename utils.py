@@ -316,18 +316,49 @@ def get_intervention_sql(cursor, user_question):
     result = cursor.fetchone()
     return result[0] if result else None
 
-# 匹配基础指标
+# 匹配基础指标并使用大模型进行逻辑判断
 def match_indicators(user_question):
     # 从文件中读取基础指标信息
     with open('indicators.json', 'r', encoding='utf-8') as file:
         data = json.load(file)
         basis_indicators = data['basis_indicators']
 
-    matched_indicators = []
-    for indicator in basis_indicators:
-        if re.search(indicator['indicator_name'], user_question) or re.search(indicator['indicator_alias'], user_question):
-            matched_indicators.append(indicator)
-    return matched_indicators
+    # 设计提示
+    basis_indicators_str = "\n".join(
+        [f"- {indicator['indicator_name']}" for indicator in basis_indicators]
+    )
+    prompt = (
+        f"请从以下基础指标中提取出用户问题中提到的指标：\n"
+        f"{basis_indicators_str}\n"
+        f"用户问题是：'{user_question}'\n"
+        f"请返回匹配到的基础指标名称的列表，以逗号分隔。"
+    )
+
+    # 创建 OpenAI 客户端
+    client = OpenAI(
+        api_key=os.getenv("OPENAI_API_KEY"),
+        base_url="https://dashscope.aliyuncs.com/compatible-mode/v1"
+    )
+    model = 'qwen2.5-72b-instruct'
+
+    # 调用大模型
+    response = client.chat.completions.create(
+        model=model,
+        messages=[{"role": "user", "content": prompt}]
+    )
+
+    # 解析响应并处理可能的格式问题
+    matched_indicators = response.choices[0].message.content.strip()
+    if matched_indicators:
+        matched_indicators_list = [indicator.strip() for indicator in matched_indicators.split(",")]
+    else:
+        matched_indicators_list = []
+
+    # 从基础指标中找到与模型输出匹配的指标
+    final_matched_indicators = [indicator for indicator in basis_indicators if
+                                indicator['indicator_name'] in matched_indicators_list]
+
+    return final_matched_indicators
 
 # 查询同义词
 def get_synonyms(cursor):
