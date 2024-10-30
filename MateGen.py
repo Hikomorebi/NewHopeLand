@@ -9,10 +9,23 @@ from utils import (
     extract_json_fields,
     process_user_input,
     sql_exec,
+    dws_connect,
     connect_to_db,
     get_synonyms,
 )
 import json
+
+system_prompt_indicator_template = """
+指标{indicator_name}的字段名为{indicator_field_name}，其计算规则为:{indicator_rule}。
+你是一名数据库专家，请根据计算规则生成正确的PostgreSQL语句。
+1. **理解用户意图**：请仔细阅读并理解用户的请求，根据用户提问对计算规则中带有‘$’符号的占位符进行填充。
+2. **使用计算规则**：请完全按照提供的计算规则模板来设计SQL语句，不要无端自行增删或修改计算规则，同时需要从用户问题中提取相关的时间等信息来填充计算规则中带有'$'符号的占位符以生成完整正确的SQL语句。
+3. **SQL规范性**：生成的SQL语句不能涵盖非法字符如"\n"，请确保生成的SQL语句能直接在数据库上执行。
+请根据计算规则给出SQL代码，并按照以下JSON格式响应：  
+{{
+    "sql": "SQL Query to run",
+}}
+"""
 
 
 def get_gpt_response(
@@ -93,7 +106,7 @@ def get_first_response(
     print("============================================================")
 
     # 解析出SQL代码和返回类型
-    sql_code,thoughts = extract_json_fields(response_message.content)
+    sql_code, thoughts = extract_json_fields(response_message.content)
 
     # 如果sql_code为空，说明无需生成sql代码
     if sql_code is None:
@@ -101,7 +114,7 @@ def get_first_response(
         return_dict["gpt_response"] = response_message.content
         messages.messages_append(response_message)
         return return_dict
-    if sql_code == '':
+    if sql_code == "":
         return_dict["status"] = 2
         return_dict["sql_error_message"] = "针对当前问题无法为您生成可用的查询。"
         return return_dict
@@ -205,12 +218,7 @@ class MateGen:
         base_url=None,
         model="gpt-3.5-turbo",
         system_content_list=[],
-        project=None,
-        messages=None,
         tokens_thr=150000,
-        available_functions=None,
-        is_enhanced_mode=False,
-        is_developer_mode=False,
     ):
         self.client = OpenAI(
             api_key=api_key if api_key else os.getenv("OPENAI_API_KEY"),
@@ -218,7 +226,6 @@ class MateGen:
         )
         self.model = model
         self.system_content_list = system_content_list
-        self.project = project
         self.tokens_thr = tokens_thr
 
         # 创建self.messages属性
@@ -226,69 +233,109 @@ class MateGen:
             system_content_list=self.system_content_list, tokens_thr=self.tokens_thr
         )
 
-        # 若初始参数messages不为None，则将其加入self.messages中
-        if messages is not None:
-            self.messages.messages_append(messages)
-
-        self.available_functions = available_functions
-        self.is_enhanced_mode = is_enhanced_mode
-        self.is_developer_mode = is_developer_mode
-
     def chat(self, question=None):
-        return_dict = {"status": 0}  # 提前声明 return_dict 变量
+        # status:0表示大模型调用失败，1表示无需生成SQL语句，2表示生成SQL错误，3表示成功生成SQL语句
+        chat_dict = {}
         if question is not None:
             user_message = {"role": "user", "content": question}
-            self.messages.messages_append(user_message)
 
-            # 首先检查是否有干预 SQL 语句或指标匹配
-            result = process_user_input(question)
-            if isinstance(result, str):
-                # 返回的是修改后的问题
-                modified_question = result
-                user_message_modified = {"role": "user", "content": modified_question}
-                self.messages.messages_append(user_message_modified)
-            elif isinstance(result, list):
-                # 返回的是匹配的基础指标
-                # 将完整的指标信息提供给大模型
-                for indicator in result:
-                    self.messages.messages_append({"role": "user", "content": json.dumps(indicator)})
+            # 该函数直接判断是否为问题干预（1）、指标问数（2）、同义词解释（3）
+            process_user_input_dict = process_user_input(question)
+
+            if process_user_input_dict["status"] == 1:
+                sql_code = process_user_input_dict["preset_sql"]
+                self.messages.messages_append(user_message)
             else:
-                # 返回的是干预问题的SQL
-                return_dict_sql_exec = sql_exec(result)
-                if return_dict_sql_exec["status"] == 0: # sql_exec(result)结果返回字典，status=0表示成功返回
-                    return_dict["status"] = 3
-                    return_dict["final_response"] = "根据预定义的 SQL 语句返回的结果"
-                    return_dict["sql_results_json"] = return_dict_sql_exec["sql_results_json"]
-                    return_dict["sql_code"] = result
-                else:
-                    return_dict["status"] = 2
-                    return_dict["sql_error_message"] = return_dict_sql_exec["error_message"]
-                return return_dict
+                indicator_message = copy.deepcopy(self.messages)
+                if process_user_input_dict["status"] == 2:
+                    indicator_data = process_user_input_dict["indicator_data"]
+                    indicator_name = process_user_input_dict["indicator_name"]
+                    system_prompt_indicator = system_prompt_indicator_template.format(
+                        indicator_name=indicator_name,
+                        indicator_field_name=indicator_data["指标字段名"],
+                        indicator_rule=indicator_data["计算规则"]
+                    )
+                    indicator_message.delete_system_messages_temp()
+                    indicator_message.add_system_message_temp(
+                        {"role": "system", "content": system_prompt_indicator}
+                    )
+                    indicator_message.messages_append(user_message)
 
-            # 第一次提问，负责得到 second_message
-            return_dict = get_first_response(
-                client=self.client,
-                model=self.model,
-                messages=self.messages,
-                available_functions=None,
-                is_developer_mode=self.is_developer_mode,
-                is_enhanced_mode=self.is_enhanced_mode,
-            )
+                    self.messages.messages_append(user_message)
 
-            # 0表示大模型调用失败，2表示生成错误的SQL语句
-            if return_dict["status"] == 0 or return_dict["status"] == 2:
-                self.messages.messages_append(
-                    {"role": "assistant", "content": "该问题无法回答。"}
+                elif process_user_input_dict["status"] == 3:
+                    modified_question = process_user_input_dict["modified_question"]
+                    indicator_message.messages_append(
+                        {"role": "user", "content": modified_question}
+                    )
+                    self.messages.messages_append(user_message)
+
+                response_message = get_gpt_response(
+                    client=self.client, model=self.model, messages=indicator_message
                 )
+                if type(response_message) is dict:
+                    chat_dict["status"] = 0
+                    chat_dict["gpt_error_message"] = response_message["content"]
+                    return chat_dict
 
-            if return_dict["status"] != 3:
-                return return_dict
+                print("============================================================")
+                print("第一次提问返回结果")
+                print(response_message.content)
+                print("============================================================")
+                # 解析出SQL代码和返回类型
+                sql_code, thoughts = extract_json_fields(response_message.content)
+                if sql_code is None:
+                    chat_dict["status"] = 1
+                    chat_dict["gpt_response"] = response_message.content
+                    self.messages.messages_append(response_message)
+                    return chat_dict
+                if sql_code == "":
+                    chat_dict["status"] = 2
+                    chat_dict["sql_error_message"] = (
+                        "针对当前问题无法为您生成可用的查询。"
+                    )
+                    self.messages.messages_append(
+                        {
+                            "role": "assistant",
+                            "content": "针对当前问题无法为您生成可用的查询。",
+                        }
+                    )
+                    return chat_dict
 
+            # 执行SQL语句
+            sql_exec_dict = dws_connect(sql_code)
+            if sql_exec_dict["status"] == 0:
+                chat_dict["status"] = 2
+                chat_dict["sql_error_message"] = sql_exec_dict["error_message"]
+                self.messages.messages_append(
+                    {
+                        "role": "assistant",
+                        "content": "针对当前问题无法为您生成可用的查询。",
+                    }
+                )
+                return chat_dict
+            copy_messages = copy.deepcopy(self.messages)
+            if sql_exec_dict["is_long"]:
+                second_message = {
+                    "role": "user",
+                    "content": "由于查询结果数据量较大，无法全部展示。但是用户已经得到所需的全部数据。根据问题请生成一段简要的描述性文字，用于配合用户得到的数据，描述查询结果的概况。例如问题：请列出2024年8月提交的所有订单。你的回答：这里展示了2024年8月提交的所有订单。尽量简洁，只需要简短一句话即可。",
+                }
+            else:
+                second_message = {
+                    "role": "user",
+                    "content": f"为了回答这个问题，生成SQL代码： {sql_code} 查询数据库，SQL查询返回结果为 {sql_exec_dict['sql_results']} ，请根据返回结果回答问题，请生成总结式的概括，尽可能简洁，你可以假装用户已经获取需要的数据，而不要在回答中直接展示数据。",
+                }
+            copy_messages.delete_system_messages_temp()
+            copy_messages.messages_append(second_message)
+
+            chat_dict["status"] = 3
+            chat_dict["sql_results_json"] = sql_exec_dict["sql_results_json"]
+            chat_dict["sql_code"] = sql_code
             response_message_stream = get_gpt_response_stream(
-                self.client, self.model, return_dict["second_message"]
+                self.client, self.model, copy_messages
             )
-            return_dict["response_message_stream"] = response_message_stream
-            return return_dict
+            chat_dict["response_message_stream"] = response_message_stream
+            return chat_dict
 
     def reset(self):
         """
@@ -297,3 +344,13 @@ class MateGen:
         self.messages = ChatMessages(
             system_content_list=self.system_content_list, tokens_thr=self.tokens_thr
         )
+
+    def replace_data_dictionary(self, data_dicrionary_md):
+        new_list = [data_dicrionary_md] + self.system_content_list
+        self.messages = ChatMessages(
+            system_content_list=new_list, tokens_thr=self.tokens_thr
+        )
+
+    def add_session_messages(self, session_messages):
+        for session_message in session_messages:
+            self.messages.messages_append(session_message)
