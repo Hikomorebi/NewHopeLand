@@ -542,6 +542,7 @@ def dws_connect(sql_query):
         host="124.70.57.67",
         port="8000",
     )
+    connection.set_client_encoding('UTF8')
     print("连接成功")
 
     try:

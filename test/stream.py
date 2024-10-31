@@ -5,7 +5,7 @@ import re
 
 def post_chat(query):
     # 接口地址
-    url = "http://me.ilisa.team:45104/chat"
+    url = "http://yjspmd.natappfree.cc/chat"
     headers = {"Content-Type": "application/json"}
     data = {"query": query,"session_id":1}
 

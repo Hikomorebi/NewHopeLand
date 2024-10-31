@@ -14,9 +14,6 @@ def connect_to_db():
     return conn, cur
 conn, cursor = connect_to_db()
 query = """  
-SELECT DATA_SET_JSON, CONTENT 
-FROM nh_chat_history
-WHERE SESSION_ID=123
 """
 cursor.execute(query)
 a = {row[0]: row[1] for row in cursor.fetchall()}

@@ -11,10 +11,11 @@ def dws_connect():
                             password="NewHope#1982@",
                             host="124.70.57.67",
                             port="8000")
+    conn.set_client_encoding('UTF8')
     print("连接成功")
 
     # 使用默认游标执行SQL，查询结果是元祖
-    query = "SELECT datadate FROM fdc_dws.dws_proj_projplansum_a_h LIMIT 10;"
+    query = "SELECT roomcode, roomname, SUM(sub_units) AS total_sub_units FROM fdc_dws.dws_proj_room_totalsale_a_min GROUP BY roomcode, roomname ORDER BY total_sub_units DESC LIMIT 1;"
     
     print("Start to execute: \"%s\"" % query)
     cursor = conn.cursor()
@@ -47,3 +48,4 @@ def dws_connect():
     print("(%d %s)" % (row, "rows" if row > 1 else "row"))
 
     conn.close()'''
+dws_connect()
