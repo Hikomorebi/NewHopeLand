@@ -5,9 +5,9 @@ import re
 
 def post_chat(query):
     # 接口地址
-    url = "http://yjspmd.natappfree.cc/chat"
+    url = "http://me.ilisa.team:45105/chat"
     headers = {"Content-Type": "application/json"}
-    data = {"query": query,"session_id":1}
+    data = {"query": query,"used_table":{"fdc_dwd":["dwd_trade_roomsign_a_min"],"fdc_dws":["dws_proj_room_totalsale_a_min","dws_proj_projplansum_a_h"]}}
 
     try:
         response = requests.post(url, headers=headers, data=json.dumps(data))
@@ -41,4 +41,4 @@ def post_chat(query):
         print("Exception occurred:", str(e))
 
 
-post_chat("再查询一下在这段时间的签约套数")
+post_chat("查询2023-10-1到2023/10/23的新增签约面积")
