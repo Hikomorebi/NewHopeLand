@@ -320,7 +320,6 @@ def connect_to_db():
     cur = conn.cursor()
     return conn, cur
 
-
 # 查询干预问题
 def get_intervention_sql(cursor, user_question):
     query = """  

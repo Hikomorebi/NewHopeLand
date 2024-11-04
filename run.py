@@ -6,6 +6,7 @@ import traceback
 from MateGen import MateGen
 import json
 from audio2text import audio_to_text
+from generate_report import generate_markdown_report, query_customer_info
 from utils import (
     default_converter,
     query_tables_description,
@@ -163,5 +164,31 @@ def audio():
         return jsonify({"status": "error", "response": "没有语音文件!"})
 
 
+@app.route("/analysis", methods=["POST"])
+def analysis():
+    try:
+        data = request.json
+        saleropenid = data.get("saleropenid")
+        start_date = data.get("start_date")
+        end_date = data.get("end_date")
+
+        if not all([saleropenid, start_date, end_date]):
+            return jsonify({"status": "error", "response": "缺少必要的参数：saleropenid, start_date 或 end_date"})
+
+        customers = query_customer_info(saleropenid, start_date, end_date)
+        if not customers:
+            return jsonify({"status": "error", "response": "未查询到相关客户信息。"})
+
+        report = generate_markdown_report(customers, saleropenid)
+
+        report_filename = f"高意向客户分析报告_{saleropenid}.md"
+        with open(report_filename, "w", encoding="utf-8") as file:
+            file.write(report)
+
+        return jsonify({"status": "success", "response": f"报告已生成并保存到 {report_filename}"})
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"status": "error", "response": str(e)})
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=45104)
