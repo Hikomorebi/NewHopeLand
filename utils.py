@@ -449,9 +449,11 @@ def process_user_input(user_question):
         return process_user_input_dict
     else:
         # 如果没有找到干预问题，进行指标匹配
+        # 查询华菁数据库获取所有指标名，以列表形式返回
         indicator_names = get_indicator_names(cursor)
+
+        # todo:需要修改，目前实现为精确匹配，第一阶段修改实现精准匹配失败后通过大语言模型实现模糊匹配，第二阶段实现向量匹配。
         indicator_name = match_indicator(user_question,indicator_names)
-        
 
         if indicator_name:
             # 如果找到匹配的指标，返回匹配的指标
@@ -475,7 +477,6 @@ def process_user_input(user_question):
             process_user_input_dict["status"] = 3
             process_user_input_dict["modified_question"] = modified_question
             return process_user_input_dict
-
 
 def sql_exec(sql_query):
     # 结果返回字典，status=0表示成功返回

@@ -74,7 +74,7 @@ def chat():
         print(data)
 
         try:
-            
+            # 暂时使用从请求的dataSource字段中获取used_tables，后续实现根据session_id查华菁数据库获取used_tables信息
             used_tables_ = json.loads(data.get("dataSource"))
         except Exception as e:
             # 捕获其他可能的错误
@@ -84,14 +84,22 @@ def chat():
 
         # 获取当前会话id
         session_id = data.get("session_id")
+
+        # 如果请求中会话id发生变化，则说明切换会话或开启新会话，需要重新加载历史会话
         if session_id != current_session_id:
             current_session_id = session_id
+
+            # 根据session_id获取历史消息，查询华菁数据库nh_chat_history表中CONTENT字段，注意需要去除id的内容。若为空，则说明开启的是新会话，返回NULL
             session_messages = get_session_messages(current_session_id)
+            # 根据session_id获取使用到的表，查询华菁数据库nh_chat_history表中DATA_SET_JSON字段获取
             used_tables = used_tables_ if used_tables_ else get_used_tables(current_session_id)
+
+            # 根据used_tables拼接获得数据字典
             data_dictionary_md = query_tables_description(used_tables)
 
-            # 更换数据字典
+            # 更换messages对象对应的数据字典部分
             mategen.replace_data_dictionary(data_dictionary_md)
+
             # 加载历史会话记录
             mategen.add_session_messages(session_messages)
 

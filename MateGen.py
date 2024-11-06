@@ -239,6 +239,7 @@ class MateGen:
         if question is not None:
             user_message = {"role": "user", "content": question}
 
+            # todo:逻辑修改，需要先进行同义词解释，再进行问题干预和指标问数。
             # 该函数直接判断是否为问题干预（1）、指标问数（2）、同义词解释（3）
             process_user_input_dict = process_user_input(question)
 
