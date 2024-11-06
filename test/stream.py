@@ -5,7 +5,7 @@ import re
 
 def post_chat(query):
     # 接口地址
-    url = "http://me.ilisa.team:45105/chat"
+    url = "http://me.ilisa.team:45107/chat"
     headers = {"Content-Type": "application/json"}
     data = {"query": query,"used_table":{"fdc_dwd":["dwd_trade_roomsign_a_min"],"fdc_dws":["dws_proj_room_totalsale_a_min","dws_proj_projplansum_a_h"]}}
 
@@ -41,4 +41,4 @@ def post_chat(query):
         print("Exception occurred:", str(e))
 
 
-post_chat("查询2023-10-1到2023/10/23的新增签约面积")
+post_chat("查询南宁盛湖悦景在 2020 年内的新增认购套数是多少")

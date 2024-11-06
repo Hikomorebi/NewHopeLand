@@ -9,6 +9,6 @@ read -p "请输入开始日期（YYYY-MM-DD）: " START_DATE
 read -p "请输入结束日期（YYYY-MM-DD）: " END_DATE
 
 # 发送带有输入参数的 POST 请求
-curl -X POST http://127.0.0.1:45104/analysis \
+curl -X POST http://127.0.0.1:45102/analysis \
      -H "Content-Type: application/json" \
      -d "{\"saleropenid\": \"$SALEROPENID\", \"start_date\": \"$START_DATE\", \"end_date\": \"$END_DATE\"}"

@@ -581,23 +581,42 @@ def dws_connect(sql_query):
     return dws_connect_dict
 
 
-def extract_json_fields(input_string):
-    # Use regex to find JSON part in the input string
-    json_match = re.search(r"{.*?}", input_string, re.DOTALL)
+# def extract_json_fields(input_string):
+#     # Use regex to find JSON part in the input string
+    
+#     json_match = re.search(r"{.*?}", input_string, re.DOTALL)
 
-    if json_match:
-        json_str = json_match.group()
+#     if json_match:
+#         json_str = json_match.group()
+#         try:
+#             # Parse the JSON string
+#             json_data = json.loads(json_str)
+#             # Extract the required fields
+#             sql = json_data.get("sql", "")
+#             thoughts = json_data.get("thoughts", "")
+#             return sql, thoughts
+#         except json.JSONDecodeError:
+#             return None, None
+#     return None, None
+def extract_json_fields(input_string):
+    # Use regex to find potential JSON parts in the input string
+    json_matches = re.findall(r"{.*?}", input_string, re.DOTALL)
+
+    for json_str in json_matches:
         try:
             # Parse the JSON string
-            json_data = json.loads(json_str)
-            # Extract the required fields
-            sql = json_data.get("sql", "")
-            thoughts = json_data.get("thoughts", "")
-            return sql, thoughts
+            
+            # Check if the JSON contains the "sql" key
+            if "sql" in json_str:
+                json_data = json.loads(json_str)
+                # Extract the required fields
+                sql = json_data.get("sql", "")
+                thoughts = json_data.get("thoughts", "")
+                return sql, thoughts
         except json.JSONDecodeError:
-            return None, None
-    return None, None
+            continue  # Skip to the next match if there's a decoding error
 
+    return None, None
 
 def query_tables_description(database_dir_mapping):
     """
@@ -644,8 +663,16 @@ def get_session_messages(current_session_id):
 
 
 if __name__ == "__main__":
-    # sql_exec("SELECT SUM(main_quantity + secondary_quantity) AS total_outbound_quantity FROM sales_outbound WHERE product_code = '040203003037';")
-    sql_exec(
-        "WITH sales_rate AS (SELECT product_code, AVG(main_quantity) AS average_sales FROM sales_order GROUP BY product_code), inventory_data AS (SELECT material_code, material_name, stock_quantity FROM inventory) SELECT i.material_name, i.stock_quantity, s.average_sales, i.stock_quantity / s.average_sales AS 库存消耗天数 FROM inventory_data i JOIN sales_rate s ON i.material_code = s.product_code WHERE s.average_sales > 0 ORDER BY 库存消耗天数 ASC LIMIT 5;"
-    )
-    # sql_exec("SELECT * FROM sales_outbound WHERE salesperson_name = '胡丹';")
+    extract_json_fields("""
+为了查询南宁盛湖悦景在2020年内的新增认购套数，我们可以使用提供的计算规则生成相应的SQL语句。假设`partitiondate`是按日分区的，我们需要将`${startdate}`和`${endd
+ate}`替换为2020年1月1日和2020年12月31日。                                                                                                        
+                                                                                                                           
+以下是生成的SQL语句：                                                                                           
+```json                                                                                                                                                      
+{                                                                                                                                                            
+    "sql": "SELECT COUNT(1) AS newsubunits, SUM(archArea) AS newsubarea, SUM(taxAmount) AS newsubamount FROM fdc_dwd.dwd_trade_roomsubscr_a_min WHERE partitiondate BETWEEN '2020-01-01' AND '2020-12-31' AND subscrexecdate BETWEEN '2020-01-01' AND '2020-12-31' AND closeDate > '2020-12-31' AND projname = '南宁盛湖悦景';"                                                                                                                                                        
+}                                                                                                                                                            
+```                                                                                                                                                          
+                                                                                                                                                            
+这个SQL语句会返回南宁盛湖悦景在2020年内的新增认购套数、新增认购面积和新增认购金额。
+""")

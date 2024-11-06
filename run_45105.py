@@ -6,6 +6,7 @@ import traceback
 from MateGen import MateGen
 import json
 from audio2text import audio_to_text
+from generate_report import generate_markdown_report, query_customer_info
 from utils import (
     default_converter,
     query_tables_description,
@@ -51,7 +52,6 @@ system_prompt_indicator_template = """
     "sql": "SQL Query to run",
 }}
 """
-used_tables = ""
 mategen = MateGen(
     api_key=os.getenv("OPENAI_API_KEY"),
     base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
@@ -68,23 +68,32 @@ def chat():
     try:
         global mategen
         global current_session_id
-        global used_tables
 
         data = request.json
 
-        used_tables = data.get("used_table")
-        # 获取当前会话id
-        #session_id = data.get("session_id")
-        # if session_id != current_session_id:
-            # current_session_id = session_id
-            # session_messages = get_session_messages(current_session_id)
-            # used_tables = get_used_tables(current_session_id)
-        data_dictionary_md = query_tables_description(used_tables)
+        print(data)
 
-        # 更换数据字典
-        mategen.replace_data_dictionary(data_dictionary_md)
+        try:
+            
+            used_tables_ = json.loads(data.get("dataSource"))
+        except Exception as e:
+            # 捕获其他可能的错误
+            print(str(e))
+            used_tables_ = None
+        print(used_tables_)
+
+        # 获取当前会话id
+        session_id = data.get("session_id")
+        if session_id != current_session_id:
+            current_session_id = session_id
+            session_messages = get_session_messages(current_session_id)
+            used_tables = used_tables_ if used_tables_ else get_used_tables(current_session_id)
+            data_dictionary_md = query_tables_description(used_tables)
+
+            # 更换数据字典
+            mategen.replace_data_dictionary(data_dictionary_md)
             # 加载历史会话记录
-            #mategen.add_session_messages(session_messages)
+            mategen.add_session_messages(session_messages)
 
         # 获取用户输入的query字段
         query = data.get("query")
@@ -166,5 +175,31 @@ def audio():
         return jsonify({"status": "error", "response": "没有语音文件!"})
 
 
+@app.route("/analysis", methods=["POST"])
+def analysis():
+    try:
+        data = request.json
+        saleropenid = data.get("saleropenid")
+        start_date = data.get("start_date")
+        end_date = data.get("end_date")
+
+        if not all([saleropenid, start_date, end_date]):
+            return jsonify({"status": "error", "response": "缺少必要的参数：saleropenid, start_date 或 end_date"})
+
+        customers = query_customer_info(saleropenid, start_date, end_date)
+        if not customers:
+            return jsonify({"status": "error", "response": "未查询到相关客户信息。"})
+
+        report = generate_markdown_report(customers, saleropenid)
+
+        report_filename = f"高意向客户分析报告_{saleropenid}.md"
+        with open(report_filename, "w", encoding="utf-8") as file:
+            file.write(report)
+
+        return jsonify({"status": "success", "response": report})
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"status": "error", "response": str(e)})
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=45105)

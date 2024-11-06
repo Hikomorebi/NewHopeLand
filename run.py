@@ -71,12 +71,23 @@ def chat():
 
         data = request.json
 
+        print(data)
+
+        try:
+            
+            used_tables_ = json.loads(data.get("dataSource"))
+        except Exception as e:
+            # 捕获其他可能的错误
+            print(str(e))
+            used_tables_ = None
+        print(used_tables_)
+
         # 获取当前会话id
         session_id = data.get("session_id")
         if session_id != current_session_id:
             current_session_id = session_id
             session_messages = get_session_messages(current_session_id)
-            used_tables = get_used_tables(current_session_id)
+            used_tables = used_tables_ if used_tables_ else get_used_tables(current_session_id)
             data_dictionary_md = query_tables_description(used_tables)
 
             # 更换数据字典
@@ -185,7 +196,7 @@ def analysis():
         with open(report_filename, "w", encoding="utf-8") as file:
             file.write(report)
 
-        return jsonify({"status": "success", "response": f"报告已生成并保存到 {report_filename}"})
+        return jsonify({"status": "success", "response": report})
 
     except Exception as e:
         traceback.print_exc()
