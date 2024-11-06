@@ -175,17 +175,34 @@ def query_customer_info(saleropenid, start_date, end_date):
 
     try:
         with connection.cursor(cursor_factory=RealDictCursor) as cursor:
+            # 数据库中存在相同客户的多条数据，只返回同一客户的最新记录
             sql = """
-            SELECT
-                username, mobile, channel, live, work, income, house, purpose,
-                position, floor, area, buyuse, familystructure, dealway,
-                interestlayout, propcondition, intentprice, liveaddress,
-                workaddress, interest, memo, usersrc, budget, visitcounts,
-                userrank, mymttj, unitprice, notbuyreason, customerchannel,
-                jobs, qq, wechat, memo1, customer_id, customerresource
-            FROM fdc_ods.ods_qw_market_dh_crm_saleruser
-            WHERE saleropenid = %s AND createtime BETWEEN %s AND %s
-            LIMIT 3
+                    WITH ranked_customers AS (
+                        SELECT 
+                            username, mobile, channel, live, work, income, house, purpose,
+                            position, floor, area, buyuse, familystructure, dealway,
+                            interestlayout, propcondition, intentprice, liveaddress,
+                            workaddress, interest, memo, usersrc, budget, visitcounts,
+                            userrank, mymttj, unitprice, notbuyreason, customerchannel,
+                            jobs, qq, wechat, memo1, customer_id, customerresource,
+                            ROW_NUMBER() OVER (PARTITION BY username, mobile ORDER BY createtime DESC) as row_num
+                        FROM 
+                            fdc_ods.ods_qw_market_dh_crm_saleruser
+                        WHERE 
+                            saleropenid = %s AND createtime BETWEEN %s AND %s
+                    )
+                    SELECT 
+                        username, mobile, channel, live, work, income, house, purpose,
+                        position, floor, area, buyuse, familystructure, dealway,
+                        interestlayout, propcondition, intentprice, liveaddress,
+                        workaddress, interest, memo, usersrc, budget, visitcounts,
+                        userrank, mymttj, unitprice, notbuyreason, customerchannel,
+                        jobs, qq, wechat, memo1, customer_id, customerresource
+                    FROM 
+                        ranked_customers
+                    WHERE 
+                        row_num = 1
+                    LIMIT 3;                      
             """
             cursor.execute(sql, (saleropenid, start_date, end_date))
             result = cursor.fetchall()
