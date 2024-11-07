@@ -658,7 +658,7 @@ def get_session_messages(current_session_id):
     # TODO
     # 连接数据库通过sql语句获取该会话历史信息，返回list
 
-    example_return_data = [{"role":"user","content":"你好"},{"role":"assistant","content":"你好，我是人工智能助手。"}] 
+    example_return_data = [] 
     
     return example_return_data
 
