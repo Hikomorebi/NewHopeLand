@@ -359,23 +359,34 @@ def get_indicator_data(cursor,indicator_name):
         return result_dict
 
 
+#def match_indicator(query, indicator_names):
+    # # 关键词列表，如“新增”表示新增相关的指标
+    # keywords = ["新增", "计划", "认购转", "认购未", "累计"]
+
+    # # 按照长度从大到小排序，优先匹配更长的指标
+    # indicator_names.sort(key=len, reverse=True)
+
+    # # 如果用户查询中包含关键词，检查匹配的指标是否包含该关键词
+    # for indicator in indicator_names:
+    #     if indicator in query:
+    #         # 如果查询中包含关键词，而匹配的指标不包含该关键词，跳过
+    #         if any(keyword in query for keyword in keywords) and not any(keyword in indicator for keyword in keywords):
+    #             continue
+    #         return indicator  # 返回匹配到的指标名称
+
+    # # 如果没有精准匹配，调用大模型进行模糊匹配
+    # return fuzzy_match_indicator(query, indicator_names)
+    
 def match_indicator(query, indicator_names):
-    # 关键词列表，如“新增”表示新增相关的指标
-    keywords = ["新增", "计划", "认购转", "认购未", "累计"]
-
-    # 按照长度从大到小排序，优先匹配更长的指标
+    # 按照长度从大到小排序
     indicator_names.sort(key=len, reverse=True)
-
-    # 如果用户查询中包含关键词，检查匹配的指标是否包含该关键词
+    
+    # 遍历指标列表，找到第一个匹配的指标
     for indicator in indicator_names:
         if indicator in query:
-            # 如果查询中包含关键词，而匹配的指标不包含该关键词，跳过
-            if any(keyword in query for keyword in keywords) and not any(keyword in indicator for keyword in keywords):
-                continue
             return indicator  # 返回匹配到的指标名称
-
-    # 如果没有精准匹配，调用大模型进行模糊匹配
-    return fuzzy_match_indicator(query, indicator_names)
+    
+    return None  # 如果没有匹配到，则返回None
 
 # 大模型模糊匹配
 def fuzzy_match_indicator(query, indicator_names):
