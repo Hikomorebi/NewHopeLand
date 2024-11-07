@@ -611,6 +611,7 @@ def dws_connect(sql_query):
 def extract_json_fields(input_string):
     # Use regex to find potential JSON parts in the input string
     json_matches = re.findall(r"{.*?}", input_string, re.DOTALL)
+    json_matches.reverse()
 
     for json_str in json_matches:
         try:

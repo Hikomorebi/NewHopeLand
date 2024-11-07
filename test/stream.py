@@ -5,9 +5,9 @@ import re
 
 def post_chat(query):
     # 接口地址
-    url = "http://me.ilisa.team:45109/chat"
+    url = "http://me.ilisa.team:45108/chat"
     headers = {"Content-Type": "application/json"}
-    data = {"session_id":"123","query": query,"dataSource":'{"fdc_dwd":["dwd_trade_roomsign_a_min"]}'}
+    data = {"session_id":"123","query": query,"dataSource":'{"fdc_dws":["dws_proj_projplansum_a_h"]}'}
 
     try:
         response = requests.post(url, headers=headers, data=json.dumps(data))
@@ -41,4 +41,4 @@ def post_chat(query):
         print("Exception occurred:", str(e))
 
 
-post_chat("查询南宁盛湖悦景在 2020 年内的新增认购套数是多少")
+post_chat("各个项目的年计划签约金额是多少？这可以让我快速了解每个项目的年度目标规模。")
