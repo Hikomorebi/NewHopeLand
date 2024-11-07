@@ -209,5 +209,6 @@ def analysis():
     except Exception as e:
         traceback.print_exc()
         return jsonify({"status": "error", "response": str(e)})
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=45109)

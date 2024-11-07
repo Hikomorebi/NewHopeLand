@@ -8,6 +8,7 @@ import re
 import traceback
 from decimal import Decimal, ROUND_HALF_UP
 from openai import OpenAI
+import Levenshtein  # 使用 Levenshtein 库来计算字符串距离
 
 # 设置环境变量（仅在当前脚本运行期间有效）
 os.environ["OPENAI_API_KEY"] = "sk-94987a750c924ae19693c9a9d7ea78f7"
@@ -320,17 +321,26 @@ def connect_to_db():
     cur = conn.cursor()
     return conn, cur
 
+# 计算两个字符串的相似度
+def get_similarity(query1, query2):
+    return Levenshtein.ratio(query1, query2)
+
 # 查询干预问题
-def get_intervention_sql(cursor, user_question):
+# 更新查询干预问题的函数以包括相似度匹配
+def get_intervention_sql(cursor, user_question, similarity_threshold=0.7):
     query = """  
-    SELECT select_sql  
+    SELECT question_name, select_sql  
     FROM nh_problem_meddle  
-    WHERE question_name = %s AND enabled = 'ENABLE' AND DELETE_FLAG = 'NOT_DELETE'  
-    LIMIT 1  
+    WHERE enabled = 'ENABLE' AND DELETE_FLAG = 'NOT_DELETE'  
     """
-    cursor.execute(query, (user_question,))
-    result = cursor.fetchone()
-    return result[0] if result else None
+    cursor.execute(query)
+    results = cursor.fetchall()
+
+    for question_name, select_sql in results:
+        similarity = get_similarity(user_question, question_name)
+        if similarity >= similarity_threshold:
+            return select_sql  # 如果相似度足够高，返回相应的 SQL 语句
+    return None
 
 def get_indicator_names(cursor):
     query = "SELECT `NAME` FROM NH_INDICATOR_MANAGEMENT"
@@ -350,65 +360,64 @@ def get_indicator_data(cursor,indicator_name):
 
 
 def match_indicator(query, indicator_names):
-    # 按照长度从大到小排序
+    # 关键词列表，如“新增”表示新增相关的指标
+    keywords = ["新增", "计划", "认购转", "认购未", "累计"]
+
+    # 按照长度从大到小排序，优先匹配更长的指标
     indicator_names.sort(key=len, reverse=True)
-    
-    # 遍历指标列表，找到第一个匹配的指标
+
+    # 如果用户查询中包含关键词，检查匹配的指标是否包含该关键词
     for indicator in indicator_names:
         if indicator in query:
+            # 如果查询中包含关键词，而匹配的指标不包含该关键词，跳过
+            if any(keyword in query for keyword in keywords) and not any(keyword in indicator for keyword in keywords):
+                continue
             return indicator  # 返回匹配到的指标名称
-    
-    return None  # 如果没有匹配到，则返回None
-# 匹配基础指标并使用大模型进行逻辑判断
-# def match_indicators(user_question):
-#     # 从文件中读取基础指标信息
-#     with open("indicators.json", "r", encoding="utf-8") as file:
-#         data = json.load(file)
-#         basis_indicators = data["basis_indicators"]
 
-#     # 设计提示
-#     basis_indicators_str = "\n".join(
-#         [f"- {indicator['indicator_name']}" for indicator in basis_indicators]
-#     )
-#     prompt = (
-#         f"请从以下基础指标中提取出用户问题中提到的指标：\n"
-#         f"{basis_indicators_str}\n"
-#         f"用户问题是：'{user_question}'\n"
-#         f"请返回匹配到的基础指标名称的列表，以逗号分隔。"
-#     )
+    # 如果没有精准匹配，调用大模型进行模糊匹配
+    return fuzzy_match_indicator(query, indicator_names)
 
-#     # 创建 OpenAI 客户端
-#     client = OpenAI(
-#         api_key=os.getenv("OPENAI_API_KEY"),
-#         base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
-#     )
-#     model = "qwen2.5-72b-instruct"
+# 大模型模糊匹配
+def fuzzy_match_indicator(query, indicator_names):
+    # 创建 OpenAI 客户端并设定模型
+    from openai import OpenAI
+    client = OpenAI(
+        api_key=os.getenv("OPENAI_API_KEY"),
+        base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+    )
+    model = "qwen2.5-72b-instruct"
 
-#     # 调用大模型
-#     response = client.chat.completions.create(
-#         model=model, messages=[{"role": "user", "content": prompt}]
-#     )
+    # 构建模型提示
+    indicator_names_str = "\n".join([f"- {indicator}" for indicator in indicator_names])
+    prompt = (
+        f"请从以下基础指标中提取出用户问题中提到的指标：\n"
+        f"{indicator_names_str}\n"
+        f"用户问题是：'{query}'\n"
+        f"请返回匹配到的基础指标名称的列表，以逗号分隔。"
+    )
 
-#     # 解析响应并处理可能的格式问题
-#     matched_indicators = response.choices[0].message.content.strip()
-#     if matched_indicators:
-#         matched_indicators_list = [
-#             indicator.strip() for indicator in matched_indicators.split(",")
-#         ]
-#     else:
-#         matched_indicators_list = []
+    # 调用大模型API进行模糊匹配
+    response = client.chat.completions.create(
+        model=model, messages=[{"role": "user", "content": prompt}]
+    )
 
-#     # 从基础指标中找到与模型输出匹配的指标
-#     final_matched_indicators = [
-#         indicator
-#         for indicator in basis_indicators
-#         if indicator["indicator_name"] in matched_indicators_list
-#     ]
+    # 解析响应并获取匹配的指标
+    matched_indicators = response.choices[0].message.content.strip()
+    if matched_indicators:
+        matched_indicators_list = [
+            indicator.strip() for indicator in matched_indicators.split(",")
+        ]
+    else:
+        matched_indicators_list = []
 
-#     return final_matched_indicators
+    # 过滤基础指标中的有效匹配项
+    final_matched_indicators = [
+        indicator for indicator in indicator_names if indicator in matched_indicators_list
+    ]
+
+    return final_matched_indicators[0] if final_matched_indicators else None
 
 
-# 查询同义词
 def get_synonyms(cursor):
     query = """  
     SELECT TERM, EXPLANATION  
