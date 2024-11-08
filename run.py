@@ -30,8 +30,9 @@ system_prompt_common = """
 3. **表与列关系**：在生成SQL时，请注意不要混淆表与列之间的关系。确保选择的表和列与用户的请求相匹配。  
 4. **SQL正确性**：请检查SQL的正确性，包括语法、表名、列名以及日期格式等。同时，确保查询在正确条件下的性能优化。  
 5. **SQL规范性**：生成的SQL语句不能涵盖非法字符如"\n"，请确保生成的SQL语句能直接在数据库上执行。
-6. **时间范围**：请确保SQL语句能够涵盖用户请求的时间范围。如果用户请求的是一段时间内的数据（如从2023年10月1日至2024年11月3日），请确保SQL语句能够正确提取这段时间内的数据。
-7. **数据呈现**：生成的SQL查询结果应以合适的形式进行数据呈现，确保信息清晰易读。
+6. **时间范围**：请确保SQL语句能够涵盖用户请求的时间范围。如果用户请求的是一段时间内的数据，请确保SQL语句能够正确提取这段时间内的数据。
+7. **完整代码**：已知现在的时间是2024年11月。请生成完整的、可执行的SQL语句，不要包含任何形式的占位符或模板变量。确保所有字段和条件都使用具体的值。
+8. **数据呈现**：生成的SQL查询结果应以合适的形式进行数据呈现，确保信息清晰易读。
 请逐步思考生成并SQL代码，并按照以下JSON格式响应：
 {
     "thoughts": "thoughts summary",
@@ -74,7 +75,7 @@ def chat():
         print(data)
 
         try:
-            
+            # 暂时使用从请求的dataSource字段中获取used_tables，后续实现根据session_id查华菁数据库获取used_tables信息
             used_tables_ = json.loads(data.get("dataSource"))
         except Exception as e:
             # 捕获其他可能的错误
@@ -84,14 +85,22 @@ def chat():
 
         # 获取当前会话id
         session_id = data.get("session_id")
+
+        # 如果请求中会话id发生变化，则说明切换会话或开启新会话，需要重新加载历史会话
         if session_id != current_session_id:
             current_session_id = session_id
+
+            # 根据session_id获取历史消息，查询华菁数据库nh_chat_history表中CONTENT字段，注意需要去除id的内容。若为空，则说明开启的是新会话，返回NULL
             session_messages = get_session_messages(current_session_id)
+            # 根据session_id获取使用到的表，查询华菁数据库nh_chat_history表中DATA_SET_JSON字段获取
             used_tables = used_tables_ if used_tables_ else get_used_tables(current_session_id)
+
+            # 根据used_tables拼接获得数据字典
             data_dictionary_md = query_tables_description(used_tables)
 
-            # 更换数据字典
+            # 更换messages对象对应的数据字典部分
             mategen.replace_data_dictionary(data_dictionary_md)
+
             # 加载历史会话记录
             mategen.add_session_messages(session_messages)
 
@@ -201,5 +210,6 @@ def analysis():
     except Exception as e:
         traceback.print_exc()
         return jsonify({"status": "error", "response": str(e)})
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=45104)
