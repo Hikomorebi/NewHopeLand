@@ -41,4 +41,4 @@ def post_chat(query):
         print("Exception occurred:", str(e))
 
 
-post_chat("查询成都皇冠湖壹号在2017年的建筑面积是多少，给出具体值")
+post_chat("查询projname为成都锦官阁的项目，展示15条即可")

@@ -9,6 +9,7 @@ import traceback
 from decimal import Decimal, ROUND_HALF_UP
 from openai import OpenAI
 import Levenshtein  # 使用 Levenshtein 库来计算字符串距离
+import time
 
 # 设置环境变量（仅在当前脚本运行期间有效）
 os.environ["OPENAI_API_KEY"] = "sk-94987a750c924ae19693c9a9d7ea78f7"
@@ -567,9 +568,13 @@ def dws_connect(sql_query):
 
     try:
         with connection.cursor() as cursor:
+            start_time = time.time()
             cursor.execute(sql_query)
 
             results = cursor.fetchall()
+            end_time = time.time()
+            elapsed_time = end_time - start_time
+            print(f"查询耗时{elapsed_time}秒")
             column_names = [desc[0] for desc in cursor.description]
             # my_df = pd.read_sql(sql_query, connection)
             # my_df.to_csv("data.csv", index=False)
@@ -685,16 +690,4 @@ def get_session_messages(current_session_id):
 
 
 if __name__ == "__main__":
-    extract_json_fields("""
-为了查询南宁盛湖悦景在2020年内的新增认购套数，我们可以使用提供的计算规则生成相应的SQL语句。假设`partitiondate`是按日分区的，我们需要将`${startdate}`和`${endd
-ate}`替换为2020年1月1日和2020年12月31日。                                                                                                        
-                                                                                                                           
-以下是生成的SQL语句：                                                                                           
-```json                                                                                                                                                      
-{                                                                                                                                                            
-    "sql": "SELECT COUNT(1) AS newsubunits, SUM(archArea) AS newsubarea, SUM(taxAmount) AS newsubamount FROM fdc_dwd.dwd_trade_roomsubscr_a_min WHERE partitiondate BETWEEN '2020-01-01' AND '2020-12-31' AND subscrexecdate BETWEEN '2020-01-01' AND '2020-12-31' AND closeDate > '2020-12-31' AND projname = '南宁盛湖悦景';"                                                                                                                                                        
-}                                                                                                                                                            
-```                                                                                                                                                          
-                                                                                                                                                            
-这个SQL语句会返回南宁盛湖悦景在2020年内的新增认购套数、新增认购面积和新增认购金额。
-""")
+    dws_connect("SELECT * FROM fdc_dwd.dwd_trade_roomsign_a_min WHERE projname = '成都锦官阁' LIMIT 15;")

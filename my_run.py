@@ -70,6 +70,8 @@ def close():
         if session_id in mategen_dict:
             del mategen_dict[session_id]
             return jsonify({"response": "已删除该会话"})
+        else:
+            return jsonify({"response": "不存在该会话"})
 
 @app.route("/chat", methods=["POST"])
 def chat():
