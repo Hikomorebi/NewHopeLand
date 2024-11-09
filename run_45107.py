@@ -53,26 +53,44 @@ system_prompt_indicator_template = """
     "sql": "SQL Query to run",
 }}
 """
+mategen_dict = {}
 mategen = MateGen(
     api_key=os.getenv("OPENAI_API_KEY"),
     base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
     model="qwen2.5-72b-instruct",
     system_content_list=[system_prompt_common],
 )
-current_session_id = -1
 
 print("Flask 启动！")
 
+@app.route("/close", methods=["POST"])
+def close():
+        data = request.json
+        session_id = data.get("session_id")
+        if session_id in mategen_dict:
+            del mategen_dict[session_id]
+            return jsonify({"response": "已删除该会话"})
 
 @app.route("/chat", methods=["POST"])
 def chat():
     try:
-        global mategen
-        global current_session_id
-
+        global mategen_dict
         data = request.json
-
+        is_new = False
         print(data)
+        # 获取当前会话id
+        session_id = data.get("session_id")
+        if session_id in mategen_dict:
+            mategen = mategen_dict[session_id]
+        else:
+            is_new = True
+            mategen = mategen = MateGen(
+                api_key=os.getenv("OPENAI_API_KEY"),
+                base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+                model="qwen2.5-72b-instruct",
+                system_content_list=[system_prompt_common],
+            )
+            mategen_dict[session_id] = mategen
 
         try:
             # 暂时使用从请求的dataSource字段中获取used_tables，后续实现根据session_id查华菁数据库获取used_tables信息
@@ -83,17 +101,15 @@ def chat():
             used_tables_ = None
         print(used_tables_)
 
-        # 获取当前会话id
-        session_id = data.get("session_id")
-
         # 如果请求中会话id发生变化，则说明切换会话或开启新会话，需要重新加载历史会话
-        if session_id != current_session_id:
+        if is_new:
             current_session_id = session_id
-
             # 根据session_id获取历史消息，查询华菁数据库nh_chat_history表中CONTENT字段，注意需要去除id的内容。若为空，则说明开启的是新会话，返回NULL
             session_messages = get_session_messages(current_session_id)
             # 根据session_id获取使用到的表，查询华菁数据库nh_chat_history表中DATA_SET_JSON字段获取
-            used_tables = used_tables_ if used_tables_ else get_used_tables(current_session_id)
+            used_tables = (
+                used_tables_ if used_tables_ else get_used_tables(current_session_id)
+            )
 
             # 根据used_tables拼接获得数据字典
             data_dictionary_md = query_tables_description(used_tables)
@@ -167,23 +183,6 @@ def chat():
         return jsonify({"status": "error", "response": str(e)})
 
 
-@app.route("/audio", methods=["POST"])
-def audio():
-    appid = "28851d54"
-    secret_key = "f8b62faf11b2f3c4bcd7eb4b930e0437"
-    if "file" in request.files:
-        audio_path = "./audio/received_audio.wav"
-        if os.path.isfile(audio_path):
-            os.remove(audio_path)
-        audio_file = request.files["file"]
-        audio_file.save(audio_path)
-        query = audio_to_text(audio_path, appid, secret_key)
-        print(f"用户语音提问：{query}")
-        return jsonify({"response": query})
-    else:
-        return jsonify({"status": "error", "response": "没有语音文件!"})
-
-
 @app.route("/analysis", methods=["POST"])
 def analysis():
     try:
@@ -193,7 +192,12 @@ def analysis():
         end_date = data.get("end_date")
 
         if not all([saleropenid, start_date, end_date]):
-            return jsonify({"status": "error", "response": "缺少必要的参数：saleropenid, start_date 或 end_date"})
+            return jsonify(
+                {
+                    "status": "error",
+                    "response": "缺少必要的参数：saleropenid, start_date 或 end_date",
+                }
+            )
 
         customers = query_customer_info(saleropenid, start_date, end_date)
         if not customers:
@@ -211,5 +215,6 @@ def analysis():
         traceback.print_exc()
         return jsonify({"status": "error", "response": str(e)})
 
+
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=45107)
+    app.run(threaded=True,host="0.0.0.0", port=45107)
