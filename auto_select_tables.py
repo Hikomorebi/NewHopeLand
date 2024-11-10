@@ -167,9 +167,9 @@ def select_table_based_on_query(query, tables_info = tables_info, client = clien
     prompt += "1. 分析查询中涉及的主要信息（例如，特定的项目名称、年份、所需的信息字段）。\n"
     prompt += "2. 请根据每个数据表的字段信息，判断查询所需的信息字段是否存在，选择那些包含完全一致的字段的表。\n"
     prompt += "3. 根据其他信息，从选择出的表格中二次筛选出最合适的一个表格\n"
-    prompt += "4. 以list的形式返回选择的数据表。\n"
+    prompt += "4. 以数据表名称的形式返回选择的数据表。\n"
 
-    prompt += "\n请按照上述步骤来选择适合的数据表。但无需解释原因，只需以list形式输出选择的数据表"
+    prompt += "\n请按照上述步骤来选择适合的数据表。但无需解释原因，只需以数据表名称输出选择的数据表"
 
     # 调用大模型 API
     try:
@@ -178,23 +178,31 @@ def select_table_based_on_query(query, tables_info = tables_info, client = clien
             messages=[{"role": "user", "content": prompt}]
         )
 
-        # 获取返回的表格选择和解释
+        # 获取返回的表格选择
         selected_tables = response.choices[0].message.content.strip()
-        # 处理返回的数据
-        table_list = selected_tables.split('\n')
-        result = {}
-        for table in table_list:
-            # 排除空行和无效行
-            if '.' in table:
-                db_name, table_name = table.split('.')
-                if db_name not in result:
-                    result[db_name] = []
-                result[db_name].append(table_name)
-        return result
+
+        # 规范化处理，将表名按照前缀分类
+        if selected_tables:
+            selected_tables_list = selected_tables.split("\n")  # 假设返回值为换行分隔的表名列表
+            table_dict = {}
+
+            for table in selected_tables_list:
+                table = table.strip()  # 去掉可能的空格
+                if table:
+                    # 提取表名前缀和表名
+                    prefix, table_name = table.split('.', 1)  # 获取点号前的前缀，点号后的部分为表名
+                    if prefix not in table_dict:
+                        table_dict[prefix] = []
+                    table_dict[prefix].append(table_name)  # 只添加表名部分，不包括前缀
+
+            return table_dict
+
+        return None
 
     except Exception as e:
         print(f"调用 API 时出错: {e}")
         return None
+
 
 
 
