@@ -1,0 +1,47 @@
+{
+    "columns": [
+        {
+            "name": "column1",
+            "field_type": "维度",
+            "default_display": true
+        },
+        {
+            "name": "column2",
+            "field_type": "指标",
+            "default_display": true,
+            "stats": {
+                "sum":1368,
+                "avg": 456,
+                "max": 789,
+                "min": 123
+            }
+        },
+        {
+            "name": "column3",
+            "field_type": "维度",
+            "default_display": false
+        }
+    ],
+    "data": {
+        "column1": [
+            "value1",
+            "value2",
+            "value3"
+        ],
+        "column2": [
+            123,
+            456,
+            789
+        ],
+        "column3": [
+            "2024-01-01",
+            "2024-01-02",
+            "2024-01-03"
+        ]
+    },
+    "metadata": {
+        "sql": "SELECT column1, column2, column3 FROM table_name",
+        "record_count": 3,
+        "display_type": "response_table"
+    }
+}

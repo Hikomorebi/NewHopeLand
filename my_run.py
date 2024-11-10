@@ -12,6 +12,7 @@ from utils import (
     query_tables_description,
     get_session_messages,
     get_used_tables,
+    test_match
 )
 
 app = Flask(__name__)
@@ -62,6 +63,17 @@ mategen = MateGen(
 )
 
 print("Flask 启动！")
+
+
+@app.route("/match", methods=["POST"])
+def match():
+        data = request.json
+        query = data.get("query")
+        indicator_name = test_match(query)
+        if indicator_name:
+            return jsonify({"response": indicator_name})
+        else:
+            return jsonify({"response": "未匹配上指标"})
 
 @app.route("/close", methods=["POST"])
 def close():
