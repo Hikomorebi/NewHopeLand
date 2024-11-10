@@ -2,6 +2,8 @@ import os
 from openai import OpenAI
 import psycopg2
 from psycopg2.extras import RealDictCursor
+import json
+import re
 
 # 设置环境变量（仅在当前脚本运行期间有效）
 os.environ["OPENAI_API_KEY"] = "sk-94987a750c924ae19693c9a9d7ea78f7"
@@ -329,8 +331,14 @@ def generate_model_suggestions_and_rank(customer_data):
 
     prompt = f"""
     {few_shot_examples}
-    根据以下客户的基本信息，生成有针对性的成交卡点、后续跟进计划以及意向等级：
+    根据以下客户的基本信息，生成有针对性的成交卡点、后续跟进计划以及意向等级并以json格式返回：
     {customer_info}
+    返回结果应包含以下字段：
+    - "客户基本信息总结": 包含客户基本信息的字典
+    - "成交卡点分析": 列表，每个元素包含卡点和详细说明
+    - "后续跟进计划": 列表，每个元素包含时间、内容、方式
+    - "意向等级": 字符串，表示客户的意向等级
+    以严格的课直接处理的JSON字符串格式输出。
     意向等级包括：
     A - 认购
     B - 高意向
@@ -402,54 +410,63 @@ def query_customer_info(saleropenid, start_date, end_date):
     finally:
         connection.close()
 
+
 # 生成 markdown 形式报告
 def generate_markdown_report(customers, saleropenid):
     report = "# 高意向客户分析报告\n"
     report += f"## 置业顾问ID: {saleropenid}\n\n"
 
     for customer in customers:
-        report += f"## Customer ID: {customer['customer_id']}\n"
-        report += f"- **Username**: {customer['username']}\n"
-        report += f"- **Mobile**: {customer['mobile']}\n"
-        report += f"- **Channel**: {customer['channel']}\n"
-        report += f"- **Live**: {customer['live']}\n"
-        report += f"- **Work**: {customer['work']}\n"
-        report += f"- **Income**: {customer['income']}\n"
-        report += f"- **House**: {customer['house']}\n"
-        report += f"- **Purpose**: {customer['purpose']}\n"
-        report += f"- **Position**: {customer['position']}\n"
-        report += f"- **Floor**: {customer['floor']}\n"
-        report += f"- **Area**: {customer['area']}\n"
-        report += f"- **Buy Use**: {customer['buyuse']}\n"
-        report += f"- **Family Structure**: {customer['familystructure']}\n"
-        report += f"- **Deal Way**: {customer['dealway']}\n"
-        report += f"- **Interest Layout**: {customer['interestlayout']}\n"
-        report += f"- **Property Condition**: {customer['propcondition']}\n"
-        report += f"- **Intent Price**: {customer['intentprice']}\n"
-        report += f"- **Live Address**: {customer['liveaddress']}\n"
-        report += f"- **Work Address**: {customer['workaddress']}\n"
-        report += f"- **Interest**: {customer['interest']}\n"
-        report += f"- **Memo**: {customer['memo']}\n"
-        report += f"- **User Source**: {customer['usersrc']}\n"
-        report += f"- **Budget**: {customer['budget']}\n"
-        report += f"- **Visit Counts**: {customer['visitcounts']}\n"
-        report += f"- **User Rank**: {customer['userrank']}\n"
-        report += f"- **Recommended**: {customer['mymttj']}\n"
-        report += f"- **Unit Price**: {customer['unitprice']}\n"
-        report += f"- **Not Buy Reason**: {customer['notbuyreason']}\n"
-        report += f"- **Customer Channel**: {customer['customerchannel']}\n"
-        report += f"- **Jobs**: {customer['jobs']}\n"
-        report += f"- **QQ**: {customer['qq']}\n"
-        report += f"- **WeChat**: {customer['wechat']}\n"
-        report += f"- **Memo1**: {customer['memo1']}\n"
-        report += f"- **Customer Resource**: {customer['customerresource']}\n"
-
-        # 调用大模型生成建议和意向等级
         suggestions_and_rank = generate_model_suggestions_and_rank(customer)
         report += suggestions_and_rank + "\n\n"
-
+    # 只保留以第一个 { 开始，直到最后一个 } 的部分
+    report_json_match = re.search(r"\{[\s\S]*\}", report)
+    if report_json_match:
+        json_report = report_json_match.group()
+        print(json_report)
+    else:
+        json_report = ""
+    filtered_report = filter_report(json_report)
+    string_report = json.dumps(filtered_report, ensure_ascii=False, indent=4)
+    string_report_data = json.loads(string_report)
+    start = report.index('{')
+    end = report.rindex('}') + 1
+    report = report[:start] + json.dumps(string_report_data, ensure_ascii=False, indent=4) + report[end:]
     return report
 
+def filter_report(report):
+    # 需要保留的客户基本信息的键
+    keys_to_keep = {"来访渠道", "客户姓名", "首复访", "客户情况补充", "最新跟进反馈"}
+    try:
+        json_data = json.loads(report)
+    except json.JSONDecodeError as e:
+        print("JSON Decode Error:", e)
+    
+    # 提取和过滤客户基本信息总结部分，仅保留指定的键
+    customer_info = json_data.get("客户基本信息总结", {})
+    filtered_customer_info = {key: value for key, value in customer_info.items() if key in keys_to_keep}
+    
+    # 检查意向等级是否包含 "A" 或 "B"
+    intent_level = json_data.get("意向等级", "")
+    if "A" in intent_level or "B" in intent_level:
+        # 如果包含 "A" 或 "B"，保留意向等级
+        filtered_intent_level = intent_level
+    else:
+        # 如果不包含，则不保留意向等级
+        filtered_intent_level = None
+
+    # 构建新的过滤后的报告
+    filtered_report = {
+        "客户基本信息总结": filtered_customer_info,
+        "成交卡点分析": json_data.get("成交卡点分析", []),
+        "后续跟进计划": json_data.get("后续跟进计划", [])
+    }
+    
+    # 仅当意向等级包含 "A" 或 "B" 时才添加到过滤后的报告
+    if filtered_intent_level:
+        filtered_report["意向等级"] = filtered_intent_level
+
+    return filtered_report
 
 def main():
     saleropenid = input("请输入置业顾问ID: ")

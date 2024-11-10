@@ -9,6 +9,7 @@ import traceback
 from decimal import Decimal, ROUND_HALF_UP
 from openai import OpenAI
 import Levenshtein  # 使用 Levenshtein 库来计算字符串距离
+import time
 
 # 设置环境变量（仅在当前脚本运行期间有效）
 os.environ["OPENAI_API_KEY"] = "sk-94987a750c924ae19693c9a9d7ea78f7"
@@ -38,63 +39,33 @@ def format_decimal_value(value):
     if formatted_value == formatted_value.to_integral_value():
         return int(formatted_value)
 
-    # 返回字符串形式的保留两位小数的数值
     return float(formatted_value)
 
 
-def get_sql_results_json(column_names, results):
-    if results == []:
-        return []
-    sql_results_json = []
-    data = []
-    data_dict = {}
-
-    columns_data = {col: [] for col in column_names}
+def get_sql_results_json(translated_column_names, type_codes, results, sql_query, results_length):
+    response_data = {col: [] for col in translated_column_names}
     for row in results:
-        for col_name, value in zip(column_names, row):
-            columns_data[col_name].append(format_decimal_value(value))
+        for col_name, value in zip(translated_column_names, row):
+            response_data[col_name].append(format_decimal_value(value))
 
-    main_dict = {}
-    titles = []
-    main_name = None
-    main_en_name = None
-    count_other = 0
-    # 遍历返回的所有字段
-    for en_name in column_names:
-        # 如果该字段为数据库中字段且其为非数值型，设置其为主字段
-        if en_name in en2zh_json.keys() and en2zh_json[en_name][1] == 0:
-            count_other += 1
-            main_en_name = en_name
-            if count_other >= 2:
-                break
+    response_columns = []
+    for i in range(len(translated_column_names)):
+        # 如果是数值型
+        if type_codes[i] == 1700:
+            numbers = [x for x in response_data[translated_column_names[i]] if x is not None]
+            if numbers == []:
+                response_columns.append({"name":translated_column_names[i],"field_type":"指标","default_display":True,"stats":{}})
+            else:
+                total_sum = sum(numbers)
+                stats = {"sum":total_sum,"avg":total_sum / len(numbers) if numbers else 0,"max":max(numbers),"min":min(numbers)}
+                response_columns.append({"name":translated_column_names[i],"field_type":"指标","default_display":True,"stats":stats})
+        else:
+            response_columns.append({"name":translated_column_names[i],"field_type":"维度","default_display":True})
+    response_metadata = {"sql": sql_query,"record_count":results_length,"display_type": "response_table"}
+    sql_response_json = {"columns":response_columns,"data":response_data,"metadata":response_metadata}
+    
 
-    if count_other == 1:
-        main_name = en2zh_json[main_en_name][0]
-        main_dict[main_name] = columns_data[main_en_name]
-        column_names.remove(main_en_name)
-    # 0代表没有非数值字段 1代表有唯一非数值字段 2代表有多个非数值字段
-    for en_name in column_names:
-        if en_name not in en2zh_json.keys():
-            main_dict[en_name] = columns_data[en_name]
-            titles.append(en_name)
-        elif en2zh_json[en_name][1] == 0:
-            main_dict[en2zh_json[en_name][0]] = columns_data[en_name]
-            titles.append(en2zh_json[en_name][0])
-        elif en2zh_json[en_name][1] == 1:
-            main_dict[en2zh_json[en_name][0]] = columns_data[en_name]
-            titles.append(en2zh_json[en_name][0])
-
-    data_dict["title"] = titles
-
-    data_dict["x"] = main_dict[main_name] if count_other == 1 else []
-    data_dict["y"] = []
-    for key in titles:
-        data_dict["y"].append({"name": key, "data": main_dict[key]})
-    data.append(data_dict)
-
-    sql_results_json.append({"name": main_name, "data": data})
-
-    return sql_results_json
+    return sql_response_json
 
 
 def add_task_decomposition_prompt(messages):
@@ -269,14 +240,19 @@ def extract_json_from_response(response_text):
         print("未找到JSON对象")
         return None
 
-
 def get_translate_column_names(column_names):
     need_translate_list = []
+    translated_column_names = []
     for column in column_names:
         if column not in en2zh_json.keys() and not is_chinese(column):
             need_translate_list.append(column)
     if need_translate_list == []:
-        return column_names
+        for column in column_names:
+            if column in en2zh_json.keys():
+                translated_column_names.append(en2zh_json[column])
+            else:
+                translated_column_names.append(column)
+        return translated_column_names
 
     prompt_template = """
     请帮我将以下变量名从英文翻译为简洁的中文变量名。变量名会以Python列表的形式提供，如：['avg_daily_outbound', 'days_to_deplete']。请注意，翻译时应尽可能保持变量名原有的语义，并以简洁准确的中文形式表示。结果应以JSON格式返回，其中英文变量名作为键，中文翻译作为值。例如：
@@ -300,13 +276,14 @@ def get_translate_column_names(column_names):
     )
     temp_dict = extract_json_from_response(response.choices[0].message.content)
 
-    translate_column_names = []
     for column in column_names:
         if column not in en2zh_json.keys() and not is_chinese(column):
-            translate_column_names.append(temp_dict[column])
+            translated_column_names.append(temp_dict[column])
+        elif column in en2zh_json.keys():
+            translated_column_names.append(en2zh_json[column])
         else:
-            translate_column_names.append(column)
-    return translate_column_names
+            translated_column_names.append(column)
+    return translated_column_names
 
 
 # 连接到Navicat(Mysql)数据库
@@ -437,13 +414,17 @@ def replace_synonyms(text, synonyms):
 
 
 def process_user_input(user_question):
-    # status=1表示问题干预成功
+    # status=1表示问题干预成功，2表示匹配到指标，3表示返回同义词解释后的语句
     process_user_input_dict = {}
     # 连接到Navicat(Mysql)数据库
     conn, cursor = connect_to_db()
 
     # 查询同义词
     synonyms = get_synonyms(cursor)  # 这里获取同义词字典
+    user_question = replace_synonyms(
+        user_question, synonyms
+    )  # 传入同义词字典
+    print(f"Modified question: {user_question}")
 
     # 查询干预问题对应的SQL语句
     preset_sql = get_intervention_sql(cursor, user_question)
@@ -451,7 +432,6 @@ def process_user_input(user_question):
     if preset_sql:
         # 如果找到干预问题，返回预设的SQL语句
         print(f"Intervention found: {preset_sql}")
-
         # 关闭数据库连接
         cursor.close()
         conn.close()
@@ -477,74 +457,12 @@ def process_user_input(user_question):
             process_user_input_dict["indicator_data"] = indicator_data
             return process_user_input_dict
         else:
-            # 如果没有找到匹配的指标，进行同义词替换
-            modified_question = replace_synonyms(
-                user_question, synonyms
-            )  # 传入同义词字典
-            print(f"Modified question for model: {modified_question}")
-            # 关闭数据库连接
-            cursor.close()
-            conn.close()
             process_user_input_dict["status"] = 3
-            process_user_input_dict["modified_question"] = modified_question
+            process_user_input_dict["user_question"] = user_question
             return process_user_input_dict
 
-def sql_exec(sql_query):
-    # 结果返回字典，status=0表示成功返回
-    return_dict = {"status": 0}
-
-    postgres_pw = os.getenv("SQL_PW")
-
-    connection = psycopg2.connect(
-        host="localhost",  # 数据库地址
-        user="postgres",  # 数据库用户名
-        password=postgres_pw,  # 数据库密码
-        dbname="nuogaomei",  # 数据库名
-        options="-c client_encoding=utf8",  # 设置字符集编码为utf8
-    )
-
-    try:
-        with connection.cursor() as cursor:
-            # SQL查询语句
-            sql = sql_query
-            cursor.execute(sql)
-
-            # 获取查询结果
-            results = cursor.fetchall()
-            column_names = [desc[0] for desc in cursor.description]
-            my_df = pd.read_sql(sql_query, connection)
-            my_df.to_csv("data.csv", index=False)
-
-            if len(results) > 100:
-                return_dict["is_long"] = True
-                # sql_results = json.dumps(results[:50], ensure_ascii=False, default=default_converter)
-            else:
-                return_dict["is_long"] = False
-                sql_results = json.dumps(
-                    results, ensure_ascii=False, default=default_converter
-                )
-                return_dict["sql_results"] = sql_results
-            translate_column_names = get_translate_column_names(column_names)
-            sql_results_json = get_sql_results_json(translate_column_names, results)
-            return_dict["status"] = 1
-            return_dict["sql_results_json"] = sql_results_json
-
-    except Exception as e:
-        traceback.print_exc()
-        return_dict["status"] = 0
-
-        error_message = str(e)
-        return_dict["error_message"] = error_message
-        # 获取报错信息
-
-        print(f"SQL 执行报错: {error_message}")
-    finally:
-        connection.close()
-
-    return return_dict
-
-
 def dws_connect(sql_query):
+    # status : 0表示sql执行报错,1表示正常返回结果，2表示查询结果为空
     dws_connect_dict = {}
     connection = psycopg2.connect(
         dbname="fdc_dc",
@@ -558,14 +476,22 @@ def dws_connect(sql_query):
 
     try:
         with connection.cursor() as cursor:
+            start_time = time.time()
             cursor.execute(sql_query)
 
             results = cursor.fetchall()
-            column_names = [desc[0] for desc in cursor.description]
-            # my_df = pd.read_sql(sql_query, connection)
-            # my_df.to_csv("data.csv", index=False)
+            end_time = time.time()
+            elapsed_time = end_time - start_time
+            print(f"查询耗时{elapsed_time}秒")
+            column_description = cursor.description
+            column_names, type_codes = zip(*((des[0], des[1]) for des in column_description))
+            results_length = len(results)
+            if results_length==0:
+                dws_connect_dict["status"] == 2
+                connection.close()
+                return dws_connect_dict
 
-            if len(results) > 100:
+            if results_length > 100:
                 dws_connect_dict["is_long"] = True
                 # sql_results = json.dumps(results[:50], ensure_ascii=False, default=default_converter)
             else:
@@ -574,8 +500,8 @@ def dws_connect(sql_query):
                     results, ensure_ascii=False, default=default_converter
                 )
                 dws_connect_dict["sql_results"] = sql_results
-            translate_column_names = get_translate_column_names(column_names)
-            sql_results_json = get_sql_results_json(translate_column_names, results)
+            translated_column_names = get_translate_column_names(column_names)
+            sql_results_json = get_sql_results_json(translated_column_names, type_codes, results, sql_query, results_length)
             dws_connect_dict["status"] = 1
             dws_connect_dict["sql_results_json"] = sql_results_json
     except Exception as e:
@@ -592,24 +518,6 @@ def dws_connect(sql_query):
 
     return dws_connect_dict
 
-
-# def extract_json_fields(input_string):
-#     # Use regex to find JSON part in the input string
-    
-#     json_match = re.search(r"{.*?}", input_string, re.DOTALL)
-
-#     if json_match:
-#         json_str = json_match.group()
-#         try:
-#             # Parse the JSON string
-#             json_data = json.loads(json_str)
-#             # Extract the required fields
-#             sql = json_data.get("sql", "")
-#             thoughts = json_data.get("thoughts", "")
-#             return sql, thoughts
-#         except json.JSONDecodeError:
-#             return None, None
-#     return None, None
 def extract_json_fields(input_string):
     # Use regex to find potential JSON parts in the input string
     json_matches = re.findall(r"{.*?}", input_string, re.DOTALL)
@@ -675,17 +583,37 @@ def get_session_messages(current_session_id):
     return example_return_data
 
 
+def test_match(user_question):
+    # 连接到Navicat(Mysql)数据库
+    conn, cursor = connect_to_db()
+
+    indicator_names = get_indicator_names(cursor)
+    indicator_name = match_indicator(user_question,indicator_names)
+    cursor.close()
+    conn.close()
+    return indicator_name
+
+def get_indicator_data_dictionary(indicator_tables):
+    try:
+        table_str = indicator_tables.strip()
+        parts = table_str.split(".")
+        if len(parts) != 2:
+            return None
+        # 将数据库部分作为键，表名部分作为值
+        return query_tables_description({parts[0]: [parts[1]]})
+    except Exception as e:
+        # 捕获任何异常，返回 None
+        return None
+
 if __name__ == "__main__":
-    extract_json_fields("""
-为了查询南宁盛湖悦景在2020年内的新增认购套数，我们可以使用提供的计算规则生成相应的SQL语句。假设`partitiondate`是按日分区的，我们需要将`${startdate}`和`${endd
-ate}`替换为2020年1月1日和2020年12月31日。                                                                                                        
-                                                                                                                           
-以下是生成的SQL语句：                                                                                           
-```json                                                                                                                                                      
-{                                                                                                                                                            
-    "sql": "SELECT COUNT(1) AS newsubunits, SUM(archArea) AS newsubarea, SUM(taxAmount) AS newsubamount FROM fdc_dwd.dwd_trade_roomsubscr_a_min WHERE partitiondate BETWEEN '2020-01-01' AND '2020-12-31' AND subscrexecdate BETWEEN '2020-01-01' AND '2020-12-31' AND closeDate > '2020-12-31' AND projname = '南宁盛湖悦景';"                                                                                                                                                        
-}                                                                                                                                                            
-```                                                                                                                                                          
-                                                                                                                                                            
-这个SQL语句会返回南宁盛湖悦景在2020年内的新增认购套数、新增认购面积和新增认购金额。
-""")
+    conn, cursor = connect_to_db()
+
+    # 查询同义词
+    synonyms = get_synonyms(cursor)  # 这里获取同义词字典
+    modified_question = replace_synonyms(
+        "dakdsak 六可阿中达打算", synonyms
+    )  # 传入同义词字典
+    # 查询同义词
+    conn.close()
+    cursor.close()
+    #dws_connect("SELECT * FROM fdc_dwd.dwd_trade_roomsign_a_min WHERE projname = '成都锦官阁' LIMIT 15;")
