@@ -218,6 +218,11 @@ class ChatMessages():
         self.messages = self.system_messages + self.history_messages
         self.num_of_system_messages += 1
 
+    def replace_system_message(self,my_system_messages):
+        self.system_messages = my_system_messages
+        self.messages = copy.deepcopy(self.system_messages)+copy.deepcopy(self.history_messages)
+
+
      
     # 清除对话消息中的function消息
     def delete_function_messages(self):

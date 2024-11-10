@@ -414,13 +414,17 @@ def replace_synonyms(text, synonyms):
 
 
 def process_user_input(user_question):
-    # status=1表示问题干预成功
+    # status=1表示问题干预成功，2表示匹配到指标，3表示返回同义词解释后的语句
     process_user_input_dict = {}
     # 连接到Navicat(Mysql)数据库
     conn, cursor = connect_to_db()
 
     # 查询同义词
     synonyms = get_synonyms(cursor)  # 这里获取同义词字典
+    user_question = replace_synonyms(
+        user_question, synonyms
+    )  # 传入同义词字典
+    print(f"Modified question: {user_question}")
 
     # 查询干预问题对应的SQL语句
     preset_sql = get_intervention_sql(cursor, user_question)
@@ -428,7 +432,6 @@ def process_user_input(user_question):
     if preset_sql:
         # 如果找到干预问题，返回预设的SQL语句
         print(f"Intervention found: {preset_sql}")
-
         # 关闭数据库连接
         cursor.close()
         conn.close()
@@ -454,74 +457,12 @@ def process_user_input(user_question):
             process_user_input_dict["indicator_data"] = indicator_data
             return process_user_input_dict
         else:
-            # 如果没有找到匹配的指标，进行同义词替换
-            modified_question = replace_synonyms(
-                user_question, synonyms
-            )  # 传入同义词字典
-            print(f"Modified question for model: {modified_question}")
-            # 关闭数据库连接
-            cursor.close()
-            conn.close()
             process_user_input_dict["status"] = 3
-            process_user_input_dict["modified_question"] = modified_question
+            process_user_input_dict["user_question"] = user_question
             return process_user_input_dict
 
-def sql_exec(sql_query):
-    # 结果返回字典，status=0表示成功返回
-    return_dict = {"status": 0}
-
-    postgres_pw = os.getenv("SQL_PW")
-
-    connection = psycopg2.connect(
-        host="localhost",  # 数据库地址
-        user="postgres",  # 数据库用户名
-        password=postgres_pw,  # 数据库密码
-        dbname="nuogaomei",  # 数据库名
-        options="-c client_encoding=utf8",  # 设置字符集编码为utf8
-    )
-
-    try:
-        with connection.cursor() as cursor:
-            # SQL查询语句
-            sql = sql_query
-            cursor.execute(sql)
-
-            # 获取查询结果
-            results = cursor.fetchall()
-            column_names = [desc[0] for desc in cursor.description]
-            my_df = pd.read_sql(sql_query, connection)
-            my_df.to_csv("data.csv", index=False)
-
-            if len(results) > 100:
-                return_dict["is_long"] = True
-                # sql_results = json.dumps(results[:50], ensure_ascii=False, default=default_converter)
-            else:
-                return_dict["is_long"] = False
-                sql_results = json.dumps(
-                    results, ensure_ascii=False, default=default_converter
-                )
-                return_dict["sql_results"] = sql_results
-            translate_column_names = get_translate_column_names(column_names)
-            sql_results_json = get_sql_results_json(translate_column_names, results)
-            return_dict["status"] = 1
-            return_dict["sql_results_json"] = sql_results_json
-
-    except Exception as e:
-        traceback.print_exc()
-        return_dict["status"] = 0
-
-        error_message = str(e)
-        return_dict["error_message"] = error_message
-        # 获取报错信息
-
-        print(f"SQL 执行报错: {error_message}")
-    finally:
-        connection.close()
-
-    return return_dict
-
-
 def dws_connect(sql_query):
+    # status : 0表示sql执行报错,1表示正常返回结果，2表示查询结果为空
     dws_connect_dict = {}
     connection = psycopg2.connect(
         dbname="fdc_dc",
@@ -577,24 +518,6 @@ def dws_connect(sql_query):
 
     return dws_connect_dict
 
-
-# def extract_json_fields(input_string):
-#     # Use regex to find JSON part in the input string
-    
-#     json_match = re.search(r"{.*?}", input_string, re.DOTALL)
-
-#     if json_match:
-#         json_str = json_match.group()
-#         try:
-#             # Parse the JSON string
-#             json_data = json.loads(json_str)
-#             # Extract the required fields
-#             sql = json_data.get("sql", "")
-#             thoughts = json_data.get("thoughts", "")
-#             return sql, thoughts
-#         except json.JSONDecodeError:
-#             return None, None
-#     return None, None
 def extract_json_fields(input_string):
     # Use regex to find potential JSON parts in the input string
     json_matches = re.findall(r"{.*?}", input_string, re.DOTALL)
@@ -670,5 +593,27 @@ def test_match(user_question):
     conn.close()
     return indicator_name
 
+def get_indicator_data_dictionary(indicator_tables):
+    try:
+        table_str = indicator_tables.strip()
+        parts = table_str.split(".")
+        if len(parts) != 2:
+            return None
+        # 将数据库部分作为键，表名部分作为值
+        return query_tables_description({parts[0]: [parts[1]]})
+    except Exception as e:
+        # 捕获任何异常，返回 None
+        return None
+
 if __name__ == "__main__":
-    dws_connect("SELECT * FROM fdc_dwd.dwd_trade_roomsign_a_min WHERE projname = '成都锦官阁' LIMIT 15;")
+    conn, cursor = connect_to_db()
+
+    # 查询同义词
+    synonyms = get_synonyms(cursor)  # 这里获取同义词字典
+    modified_question = replace_synonyms(
+        "dakdsak 六可阿中达打算", synonyms
+    )  # 传入同义词字典
+    # 查询同义词
+    conn.close()
+    cursor.close()
+    #dws_connect("SELECT * FROM fdc_dwd.dwd_trade_roomsign_a_min WHERE projname = '成都锦官阁' LIMIT 15;")
