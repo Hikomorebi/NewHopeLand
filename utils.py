@@ -487,7 +487,7 @@ def dws_connect(sql_query):
             column_names, type_codes = zip(*((des[0], des[1]) for des in column_description))
             results_length = len(results)
             if results_length==0:
-                dws_connect_dict["status"] == 2
+                dws_connect_dict["status"] = 2
                 connection.close()
                 return dws_connect_dict
 
