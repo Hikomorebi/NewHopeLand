@@ -605,15 +605,20 @@ def get_indicator_data_dictionary(indicator_tables):
         # 捕获任何异常，返回 None
         return None
 
+def dict_intersection(dict1, dict2):
+    # 初始化结果字典
+    result = {}
+    
+    # 遍历第一个字典的每个键
+    for key in dict1:
+        # 如果第二个字典中也有该键
+        if key in dict2:
+            # 计算两个列表的交集
+            common_tables = list(set(dict1[key]) & set(dict2[key]))
+            # 如果交集非空，将结果添加到结果字典
+            if common_tables:
+                result[key] = common_tables
+    
+    return result
 if __name__ == "__main__":
-    conn, cursor = connect_to_db()
-
-    # 查询同义词
-    synonyms = get_synonyms(cursor)  # 这里获取同义词字典
-    modified_question = replace_synonyms(
-        "dakdsak 六可阿中达打算", synonyms
-    )  # 传入同义词字典
-    # 查询同义词
-    conn.close()
-    cursor.close()
-    #dws_connect("SELECT * FROM fdc_dwd.dwd_trade_roomsign_a_min WHERE projname = '成都锦官阁' LIMIT 15;")
+    dws_connect("SELECT roomname, CAST(contrtotalprice AS numeric) AS total_contract_price, buildname, formatname, propertyconsultant, custtype FROM fdc_dwd.dwd_trade_roomsign_a_min WHERE projname = '成都锦官阁' AND signdate >= '2023-01-01' AND signdate < '2024-01-01' ORDER BY total_contract_price DESC LIMIT 5;")

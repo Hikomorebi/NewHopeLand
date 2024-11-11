@@ -5,13 +5,13 @@ import os
 import traceback
 from MateGen import MateGen
 import json
-from audio2text import audio_to_text
 from generate_report import generate_markdown_report, query_customer_info
 from utils import (
     default_converter,
     query_tables_description,
     get_session_messages,
     get_used_tables,
+    test_match
 )
 
 app = Flask(__name__)
@@ -19,72 +19,86 @@ app = Flask(__name__)
 # 设置环境变量（仅在当前脚本运行期间有效）
 os.environ["OPENAI_API_KEY"] = "sk-94987a750c924ae19693c9a9d7ea78f7"
 
-# 先不读取这个字典了，存在问题
-# with open('xinxiwang_dictionary.md', 'r', encoding='utf-8') as f:
-#     md_content = f.read()
-
 system_prompt_common = """
 你是一名数据库专家，请根据用户的输入回答问题。
-1. **理解用户意图**：首先，请仔细阅读并理解用户的请求，使用数据库字典提供的表结构和各字段信息创建正确的PostgreSQL语句。
-2. **使用数据字典**：只能使用提供的数据信息生成正确的PostgreSQL语句。如果无法根据提供的信息生成SQL，请说：“提供的表结构信息不足以生成SQL查询。” 禁止随意编造信息。  
-3. **表与列关系**：在生成SQL时，请注意不要混淆表与列之间的关系。确保选择的表和列与用户的请求相匹配。  
-4. **SQL正确性**：请检查SQL的正确性，包括语法、表名、列名以及日期格式等。同时，确保查询在正确条件下的性能优化。  
-5. **SQL规范性**：生成的SQL语句不能涵盖非法字符如"\n"，请确保生成的SQL语句能直接在数据库上执行。
-6. **时间范围**：请确保SQL语句能够涵盖用户请求的时间范围。如果用户请求的是一段时间内的数据，请确保SQL语句能够正确提取这段时间内的数据。
-7. **完整代码**：已知现在的时间是2024年11月。请生成完整的、可执行的SQL语句，不要包含任何形式的占位符或模板变量。确保所有字段和条件都使用具体的值。
-8. **数据呈现**：生成的SQL查询结果应以合适的形式进行数据呈现，确保信息清晰易读。
+1. 首先，请仔细阅读并理解用户的请求，使用数据库字典提供的表结构和各字段信息创建正确的PostgreSQL语句。
+2. 只能使用提供的数据字典信息生成正确的PostgreSQL语句。已知现在的时间是2024年11月。请生成完整的、可执行的SQL语句，不要包含任何形式的占位符或模板变量。确保所有字段和条件都使用具体的值。禁止随意假设不存在的信息。  
+3. 在生成SQL时，请注意不要混淆表与列之间的关系。确保选择的表和列与用户的请求相匹配。  
+4. 请确保SQL的正确性，包括语法、表名、列名以及日期格式等。同时，确保查询在正确条件下的性能优化。
+5. 生成的SQL语句不能涵盖非法字符如"\n"，请确保生成的SQL语句能直接在数据库上执行。
+6. 请确保SQL语句能够涵盖用户请求的时间范围。如果用户请求的是一段时间内的数据，请确保SQL语句能够正确提取这段时间内的数据。
+7. 生成的SQL语句选择的字段分为核心字段和相关字段，核心字段是与用户需求连接最紧密的字段，相关字段是与用户需求相关的其他字段，确保信息的完整性。
+8. 请从如下给出的展示方式种选择最优的一种用以进行数据渲染，将类型名称放入返回要求格式的display_type参数值中，可用数据展示方式如下:
+{
+    "response_line_chart": "用于显示对比趋势分析数据",
+    "response_pie_chart": "适用于比例和分布统计场景",
+    "response_bar_chart": "适用于对比多个类别的数据大小、展示分类数据的分布和差异等"
+}
 请逐步思考生成并SQL代码，并按照以下JSON格式响应：
 {
     "thoughts": "thoughts summary",
     "sql": "SQL Query to run",
+    "key_fields":"fields most relevant to the query",
+    "display_type":"data display method"
 }
 确保回答是正确的JSON格式，并且可以被Python的json.loads解析。
+如下给出一个示例，问题：查询成都锦官阁签约日期在2023年合同总价最高的5个房间的房间名称和合同总价。
+回答：
+{
+    "thoughts": "用户希望查询成都锦官阁项目中2023年签约且合同总价最高的5个房间信息。核心字段为房间名称 `roomname` 和合同总价 `contrtotalprice`，并按总价降序排列，限制前5个结果。为增加背景信息，选择 `buildname`（楼栋名称）、`formatname`（业态名称）、`propertyconsultant`（置业顾问名称）和 `custtype`（客户类型）等字段。这些字段提供房间所在楼栋、业态类型、负责顾问及客户类型的辅助信息，帮助用户全面了解房间的其他相关属性。为能够清晰地展示各房间总价的相对大小，display_type设为response_bar_chart。",
+    "sql": "SELECT roomname, CAST(contrtotalprice AS numeric) AS total_contract_price, buildname, formatname, propertyconsultant, custtype FROM fdc_dwd.dwd_trade_roomsign_a_min WHERE projname = '成都锦官阁' AND signdate >= '2023-01-01' AND signdate < '2024-01-01' ORDER BY total_contract_price DESC LIMIT 5;",
+    "key_fields": "roomname, total_contract_price",
+    "display_type": "response_bar_chart"
+}
 """
-system_prompt_indicator_template = """
-以json格式给出指标{indicator}的描述，
-{indicator_json}
-你是一名数据库专家，请根据指标描述生成正确的PostgreSQL语句。
-1. **理解用户意图**：请仔细阅读并理解用户的请求，使用数据库字典提供的表结构和各字段信息，以及指标描述中的计算规则生成SQL语句。
-2. **使用计算规则**：请完全按照提供的计算规则模板来设计SQL语句，不要无端自行增删或修改计算规则，同时需要从用户问题中提取相关的时间等信息来填充计算规则中带有'$'符号的部分以生成完整正确的SQL语句。
-3. **SQL规范性**：生成的SQL语句不能涵盖非法字符如"\n"，请确保生成的SQL语句能直接在数据库上执行。
-请逐步思考生成并SQL代码，并按照以下JSON格式响应：  
-{{
-    "thoughts": "thoughts summary",
-    "sql": "SQL Query to run",
-}}
-"""
+
 mategen_dict = {}
-mategen = MateGen(
-    api_key=os.getenv("OPENAI_API_KEY"),
-    base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
-    model="qwen2.5-72b-instruct",
-    system_content_list=[system_prompt_common],
-)
+
 
 print("Flask 启动！")
+
+
+@app.route("/match", methods=["POST"])
+def match():
+        data = request.json
+        query = data.get("query")
+        indicator_name = test_match(query)
+        if indicator_name:
+            return jsonify({"response": indicator_name})
+        else:
+            return jsonify({"response": "未匹配上指标"})
 
 @app.route("/close", methods=["POST"])
 def close():
         data = request.json
         session_id = data.get("session_id")
+        print("******************************")
         if session_id in mategen_dict:
             del mategen_dict[session_id]
+            print(f"删除session_id:{session_id}")
             return jsonify({"response": "已删除该会话"})
-
+        else:
+            print(f"没有该会话session_id:{session_id}")
+            return jsonify({"response": "不存在该会话"})
+        
 @app.route("/chat", methods=["POST"])
 def chat():
     try:
         global mategen_dict
         data = request.json
         is_new = False
+        print("打印data内容：")
         print(data)
+        print("显示当前所有会话id：")
+        for m in mategen_dict.keys():
+            print(m)
         # 获取当前会话id
         session_id = data.get("session_id")
         if session_id in mategen_dict:
             mategen = mategen_dict[session_id]
         else:
             is_new = True
-            mategen = mategen = MateGen(
+            mategen = MateGen(
                 api_key=os.getenv("OPENAI_API_KEY"),
                 base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
                 model="qwen2.5-72b-instruct",

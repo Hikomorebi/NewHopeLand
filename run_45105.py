@@ -27,13 +27,29 @@ system_prompt_common = """
 4. 请确保SQL的正确性，包括语法、表名、列名以及日期格式等。同时，确保查询在正确条件下的性能优化。
 5. 生成的SQL语句不能涵盖非法字符如"\n"，请确保生成的SQL语句能直接在数据库上执行。
 6. 请确保SQL语句能够涵盖用户请求的时间范围。如果用户请求的是一段时间内的数据，请确保SQL语句能够正确提取这段时间内的数据。
-7. 生成的SQL查询结果应以合适的形式进行数据呈现，确保信息清晰易读。
+7. 生成的SQL语句选择的字段分为核心字段和相关字段，核心字段是与用户需求连接最紧密的字段，相关字段是与用户需求相关的其他字段，确保信息的完整性。
+8. 请从如下给出的展示方式种选择最优的一种用以进行数据渲染，将类型名称放入返回要求格式的display_type参数值中，可用数据展示方式如下:
+{
+    "response_line_chart": "用于显示对比趋势分析数据",
+    "response_pie_chart": "适用于比例和分布统计场景",
+    "response_bar_chart": "适用于对比多个类别的数据大小、展示分类数据的分布和差异等"
+}
 请逐步思考生成并SQL代码，并按照以下JSON格式响应：
 {
     "thoughts": "thoughts summary",
     "sql": "SQL Query to run",
+    "key_fields":"fields most relevant to the query",
+    "display_type":"data display method"
 }
 确保回答是正确的JSON格式，并且可以被Python的json.loads解析。
+如下给出一个示例，问题：查询成都锦官阁签约日期在2023年合同总价最高的5个房间的房间名称和合同总价。
+回答：
+{
+    "thoughts": "用户希望查询成都锦官阁项目中2023年签约且合同总价最高的5个房间信息。核心字段为房间名称 `roomname` 和合同总价 `contrtotalprice`，并按总价降序排列，限制前5个结果。为增加背景信息，选择 `buildname`（楼栋名称）、`formatname`（业态名称）、`propertyconsultant`（置业顾问名称）和 `custtype`（客户类型）等字段。这些字段提供房间所在楼栋、业态类型、负责顾问及客户类型的辅助信息，帮助用户全面了解房间的其他相关属性。为能够清晰地展示各房间总价的相对大小，display_type设为response_bar_chart。",
+    "sql": "SELECT roomname, CAST(contrtotalprice AS numeric) AS total_contract_price, buildname, formatname, propertyconsultant, custtype FROM fdc_dwd.dwd_trade_roomsign_a_min WHERE projname = '成都锦官阁' AND signdate >= '2023-01-01' AND signdate < '2024-01-01' ORDER BY total_contract_price DESC LIMIT 5;",
+    "key_fields": "roomname, total_contract_price",
+    "display_type": "response_bar_chart"
+}
 """
 
 mategen_dict = {}
@@ -74,7 +90,6 @@ def chat():
         print("打印data内容：")
         print(data)
         print("显示当前所有会话id：")
-        # return jsonify({"response": "1234qwer"})
         for m in mategen_dict.keys():
             print(m)
         # 获取当前会话id
