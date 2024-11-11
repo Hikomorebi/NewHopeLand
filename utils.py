@@ -621,4 +621,4 @@ def dict_intersection(dict1, dict2):
     
     return result
 if __name__ == "__main__":
-    dws_connect("SELECT roomname, CAST(contrtotalprice AS numeric) AS total_contract_price, buildname, formatname, propertyconsultant, custtype FROM fdc_dwd.dwd_trade_roomsign_a_min WHERE projname = '成都锦官阁' AND signdate >= '2023-01-01' AND signdate < '2024-01-01' ORDER BY total_contract_price DESC LIMIT 5;")
+    dws_connect("SELECT roomname, CAST(contrtotalprice AS numeric) AS total_contract_price, buildname, formatname, propertyconsultant, custtype FROM fdc_dwd.dwd_trade_roomsign_a_min WHERE projname = '成都锦官阁' AND signdate >= '2023-01-01' AND signdate < '2024-01-01' AND partitiondate=current_date ORDER BY total_contract_price DESC LIMIT 5;")

@@ -11,9 +11,10 @@ from utils import (
     query_tables_description,
     get_session_messages,
     get_used_tables,
-    test_match
+    test_match,
+    dict_intersection
 )
-
+from auto_select_tables import select_table_based_on_query
 app = Flask(__name__)
 
 # 设置环境变量（仅在当前脚本运行期间有效）
@@ -24,9 +25,9 @@ system_prompt_common = """
 1. 首先，请仔细阅读并理解用户的请求，使用数据库字典提供的表结构和各字段信息创建正确的PostgreSQL语句。
 2. 只能使用提供的数据字典信息生成正确的PostgreSQL语句。已知现在的时间是2024年11月。请生成完整的、可执行的SQL语句，不要包含任何形式的占位符或模板变量。确保所有字段和条件都使用具体的值。禁止随意假设不存在的信息。  
 3. 在生成SQL时，请注意不要混淆表与列之间的关系。确保选择的表和列与用户的请求相匹配。  
-4. 请确保SQL的正确性，包括语法、表名、列名以及日期格式等。同时，确保查询在正确条件下的性能优化。
+4. 请确保SQL的正确性，包括语法、表名、列名以及日期格式等。同时，确保查询在正确条件下的性能优化。如果数据字典中存在partitiondate字段表，请务必在筛选条件中加入partitiondate=current_date。
 5. 生成的SQL语句不能涵盖非法字符如"\n"，请确保生成的SQL语句能直接在数据库上执行。
-6. 请确保SQL语句能够涵盖用户请求的时间范围。如果用户请求的是一段时间内的数据，请确保SQL语句能够正确提取这段时间内的数据。
+6. 如果用户请求的是一段时间内的数据，请确保SQL语句能够正确提取这段时间内的数据。
 7. 生成的SQL语句选择的字段分为核心字段和相关字段，核心字段是与用户需求连接最紧密的字段，相关字段是与用户需求相关的其他字段，确保信息的完整性。
 8. 请从如下给出的展示方式种选择最优的一种用以进行数据渲染，将类型名称放入返回要求格式的display_type参数值中，可用数据展示方式如下:
 {
@@ -46,14 +47,14 @@ system_prompt_common = """
 回答：
 {
     "thoughts": "用户希望查询成都锦官阁项目中2023年签约且合同总价最高的5个房间信息。核心字段为房间名称 `roomname` 和合同总价 `contrtotalprice`，并按总价降序排列，限制前5个结果。为增加背景信息，选择 `buildname`（楼栋名称）、`formatname`（业态名称）、`propertyconsultant`（置业顾问名称）和 `custtype`（客户类型）等字段。这些字段提供房间所在楼栋、业态类型、负责顾问及客户类型的辅助信息，帮助用户全面了解房间的其他相关属性。为能够清晰地展示各房间总价的相对大小，display_type设为response_bar_chart。",
-    "sql": "SELECT roomname, CAST(contrtotalprice AS numeric) AS total_contract_price, buildname, formatname, propertyconsultant, custtype FROM fdc_dwd.dwd_trade_roomsign_a_min WHERE projname = '成都锦官阁' AND signdate >= '2023-01-01' AND signdate < '2024-01-01' ORDER BY total_contract_price DESC LIMIT 5;",
+    "sql": "SELECT roomname, CAST(contrtotalprice AS numeric) AS total_contract_price, buildname, formatname, propertyconsultant, custtype FROM fdc_dwd.dwd_trade_roomsign_a_min WHERE projname = '成都锦官阁' AND signdate >= '2023-01-01' AND signdate < '2024-01-01' AND partitiondate=current_date ORDER BY total_contract_price DESC LIMIT 5;",
     "key_fields": "roomname, total_contract_price",
     "display_type": "response_bar_chart"
 }
 """
 
 mategen_dict = {}
-
+all_tables = {"fdc_ads":["ads_salesreport_subscranalyse_a_min","ads_salesreport_visitweekanalyse_a_min"],"fdc_dwd":["dwd_cust_custvisitflow_a_min","dwd_trade_roomreceivable_a_min","dwd_trade_roomsign_a_min","dwd_trade_roomsmsubscr_a_min","dwd_trade_roomsubscr_a_min"],"fdc_dws":["dws_proj_projplansum_a_h","dws_proj_room_totalsale_a_min"]}
 
 print("Flask 启动！")
 
@@ -92,6 +93,7 @@ def chat():
         print("显示当前所有会话id：")
         for m in mategen_dict.keys():
             print(m)
+        
         # 获取当前会话id
         session_id = data.get("session_id")
         if session_id in mategen_dict:
@@ -106,14 +108,25 @@ def chat():
             )
             mategen_dict[session_id] = mategen
 
+        # 获取用户输入的query字段
+        query = data.get("query")
+        print("\n\n++++++++++++++++++++++++++++++")
+        print(f"用户文本提问：{query}")
+
         try:
             # 暂时使用从请求的dataSource字段中获取used_tables，后续实现根据session_id查华菁数据库获取used_tables信息
-            used_tables_ = json.loads(data.get("dataSource"))
+            chosen_tables = json.loads(data.get("dataSource"))
         except Exception as e:
             # 捕获其他可能的错误
             print(str(e))
-            used_tables_ = None
-        print(used_tables_)
+            chosen_tables = None
+
+        try:
+            available_tables = json.loads(data.get("availableTables"))
+        except Exception as e:
+            print(str(e))
+            available_tables = all_tables
+ 
 
         # 如果请求中会话id发生变化，则说明切换会话或开启新会话，需要重新加载历史会话
         if is_new:
@@ -121,9 +134,9 @@ def chat():
             # 根据session_id获取历史消息，查询华菁数据库nh_chat_history表中CONTENT字段，注意需要去除id的内容。若为空，则说明开启的是新会话，返回NULL
             session_messages = get_session_messages(current_session_id)
             # 根据session_id获取使用到的表，查询华菁数据库nh_chat_history表中DATA_SET_JSON字段获取
-            used_tables = (
-                used_tables_ if used_tables_ else get_used_tables(current_session_id)
-            )
+            if chosen_tables is None:
+                chosen_tables = select_table_based_on_query(query)
+            used_tables = dict_intersection(chosen_tables,available_tables)
 
             # 根据used_tables拼接获得数据字典
             data_dictionary_md = query_tables_description(used_tables)
@@ -133,11 +146,6 @@ def chat():
 
             # 加载历史会话记录
             mategen.add_session_messages(session_messages)
-
-        # 获取用户输入的query字段
-        query = data.get("query")
-        print("\n\n++++++++++++++++++++++++++++++")
-        print(f"用户文本提问：{query}")
 
         # 开启一次新的对话
         if query == "reset":
