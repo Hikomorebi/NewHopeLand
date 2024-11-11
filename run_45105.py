@@ -10,7 +10,6 @@ from utils import (
     default_converter,
     query_tables_description,
     get_session_messages,
-    get_used_tables,
     test_match,
     dict_intersection
 )
