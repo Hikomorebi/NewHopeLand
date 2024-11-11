@@ -42,7 +42,7 @@ def format_decimal_value(value):
     return float(formatted_value)
 
 
-def get_sql_results_json(translated_column_names, type_codes, results, sql_query, results_length):
+def get_sql_results_json(translated_column_names, type_codes, results, sql_query, results_length, positions, display_type):
     response_data = {col: [] for col in translated_column_names}
     for row in results:
         for col_name, value in zip(translated_column_names, row):
@@ -54,14 +54,14 @@ def get_sql_results_json(translated_column_names, type_codes, results, sql_query
         if type_codes[i] == 1700:
             numbers = [x for x in response_data[translated_column_names[i]] if x is not None]
             if numbers == []:
-                response_columns.append({"name":translated_column_names[i],"field_type":"指标","default_display":True,"stats":{}})
+                response_columns.append({"name":translated_column_names[i],"field_type":"指标","default_display":True if i in positions else False,"stats":{}})
             else:
                 total_sum = sum(numbers)
                 stats = {"sum":total_sum,"avg":total_sum / len(numbers) if numbers else 0,"max":max(numbers),"min":min(numbers)}
                 response_columns.append({"name":translated_column_names[i],"field_type":"指标","default_display":True,"stats":stats})
         else:
-            response_columns.append({"name":translated_column_names[i],"field_type":"维度","default_display":True})
-    response_metadata = {"sql": sql_query,"record_count":results_length,"display_type": "response_table"}
+            response_columns.append({"name":translated_column_names[i],"field_type":"维度","default_display":True if i in positions else False})
+    response_metadata = {"sql": sql_query,"record_count":results_length,"display_type": display_type}
     sql_response_json = {"columns":response_columns,"data":response_data,"metadata":response_metadata}
     
 
@@ -461,7 +461,10 @@ def process_user_input(user_question):
             process_user_input_dict["user_question"] = user_question
             return process_user_input_dict
 
-def dws_connect(sql_query):
+def dws_connect(sql_query,key_fields,display_type):
+    if key_fields is None:
+        key_fields=""
+    key_field_words = [word.strip() for word in key_fields.split(',')]
     # status : 0表示sql执行报错,1表示正常返回结果，2表示查询结果为空
     dws_connect_dict = {}
     connection = psycopg2.connect(
@@ -485,6 +488,9 @@ def dws_connect(sql_query):
             print(f"查询耗时{elapsed_time}秒")
             column_description = cursor.description
             column_names, type_codes = zip(*((des[0], des[1]) for des in column_description))
+
+            positions = {i for i, word in enumerate(column_names) if word in key_field_words}
+
             results_length = len(results)
             if results_length==0:
                 dws_connect_dict["status"] = 2
@@ -501,7 +507,7 @@ def dws_connect(sql_query):
                 )
                 dws_connect_dict["sql_results"] = sql_results
             translated_column_names = get_translate_column_names(column_names)
-            sql_results_json = get_sql_results_json(translated_column_names, type_codes, results, sql_query, results_length)
+            sql_results_json = get_sql_results_json(translated_column_names, type_codes, results, sql_query, results_length, positions, display_type)
             dws_connect_dict["status"] = 1
             dws_connect_dict["sql_results_json"] = sql_results_json
     except Exception as e:
@@ -533,11 +539,13 @@ def extract_json_fields(input_string):
                 # Extract the required fields
                 sql = json_data.get("sql", "")
                 thoughts = json_data.get("thoughts", "")
-                return sql, thoughts
+                key_fields = json_data.get("key_fields","")
+                display_type = json_data.get("display_type","")
+                return sql, thoughts, key_fields, display_type
         except json.JSONDecodeError:
             continue  # Skip to the next match if there's a decoding error
 
-    return None, None
+    return None, None, None, None
 
 def query_tables_description(database_dir_mapping):
     """

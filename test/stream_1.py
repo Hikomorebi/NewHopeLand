@@ -41,4 +41,4 @@ def post_chat(query):
         print("Exception occurred:", str(e))
 
 
-post_chat("2017年成都皇冠湖壹号签了多少套新房？")
+post_chat("查询成都锦官阁签约日期在2023年合同总价最高的5个房间的房间名称和合同总价")

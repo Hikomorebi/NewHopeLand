@@ -9,8 +9,6 @@ from utils import (
     extract_json_fields,
     process_user_input,
     dws_connect,
-    connect_to_db,
-    get_synonyms,
     get_indicator_data_dictionary
 )
 import json
@@ -21,7 +19,7 @@ system_prompt_indicator_template = """
 1. 请仔细阅读并理解用户的请求。参考数据库字典提供的表结构和各字段信息，根据计算规则生成正确的PostgreSQL语句。
 2. 如果计算规则已经是SQL语句，请完全按照提供的计算规则模板来设计SQL语句，不要无端自行增删或修改计算规则，同时需要从用户问题中提取相关的时间等信息来填充计算规则中带有'$'符号的占位符以生成完整正确的SQL语句。
 3. 请确保所有字段和条件都使用具体的值。禁止随意假设不存在的信息。要求生成的SQL语句能够直接运行。
-4. 在从用户提问中提取项目名称时，注意如"成都皇冠湖壹号","温州立体城"才是完整的项目名称，不要只提取"皇冠湖壹号"和"立体城"。
+4. 在从用户提问中提取项目名称时，项目名称可能包含城市名，应视为一个完整的字符串，不要拆分。如"成都皇冠湖壹号","温州立体城"才是完整的项目名称。
 请根据计算规则给出SQL代码，并按照以下JSON格式响应：
 {{
     "sql": "SQL Query to run",
@@ -163,7 +161,7 @@ class MateGen:
                 print(response_message.content)
                 print("============================================================")
                 # 解析出SQL代码和返回类型
-                sql_code, thoughts = extract_json_fields(response_message.content)
+                sql_code, thoughts, key_fields, display_type  = extract_json_fields(response_message.content)
                 if sql_code is None:
                     chat_dict["status"] = 1
                     chat_dict["gpt_response"] = response_message.content
@@ -184,7 +182,7 @@ class MateGen:
 
             # 执行SQL语句
             # status : 0表示sql执行报错,1表示正常返回结果，2表示查询结果为空
-            sql_exec_dict = dws_connect(sql_code)
+            sql_exec_dict = dws_connect(sql_code,key_fields,display_type)
             if sql_exec_dict["status"] == 0:
                 chat_dict["status"] = 2
                 chat_dict["sql_error_message"] = sql_exec_dict["error_message"]
