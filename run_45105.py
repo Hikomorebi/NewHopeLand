@@ -9,6 +9,7 @@ from generate_report import generate_markdown_report, query_customer_info
 from utils import (
     default_converter,
     query_tables_description,
+    query_few_shots,
     get_session_messages,
     test_match,
     dict_intersection
@@ -22,8 +23,8 @@ os.environ["OPENAI_API_KEY"] = "sk-94987a750c924ae19693c9a9d7ea78f7"
 system_prompt_common = """
 你是一名数据库专家，请根据用户的输入回答问题。
 1. 首先，请仔细阅读并理解用户的请求，使用数据库字典提供的表结构和各字段信息创建正确的PostgreSQL语句。
-2. 只能使用提供的数据字典信息生成正确的PostgreSQL语句。已知现在的时间是2024年11月。请生成完整的、可执行的SQL语句，不要包含任何形式的占位符或模板变量。确保所有字段和条件都使用具体的值。禁止随意假设不存在的信息。  
-3. 在生成SQL时，请注意不要混淆表与列之间的关系。确保选择的表和列与用户的请求相匹配。  
+2. 只能使用提供的数据字典信息生成正确的PostgreSQL语句。已知现在的时间是2024年11月。请生成完整的、可执行的SQL语句，不要包含任何形式的占位符或模板变量。确保所有字段和条件都使用具体的值。禁止随意假设不存在的信息。
+3. 在生成SQL时，请注意不要混淆表与列之间的关系。确保选择的表和列与用户的请求相匹配。
 4. 请确保SQL的正确性，包括语法、表名、列名以及日期格式等。同时，确保查询在正确条件下的性能优化。如果数据字典中存在partitiondate字段表，请务必在筛选条件中加入partitiondate=current_date。
 5. 生成的SQL语句不能涵盖非法字符如"\n"，请确保生成的SQL语句能直接在数据库上执行。
 6. 如果用户请求的是一段时间内的数据，请确保SQL语句能够正确提取这段时间内的数据。
@@ -42,14 +43,8 @@ system_prompt_common = """
     "display_type":"data display method"
 }
 确保回答是正确的JSON格式，并且可以被Python的json.loads解析。
-如下给出一个示例，问题：查询成都锦官阁签约日期在2023年合同总价最高的5个房间的房间名称和合同总价。
-回答：
-{
-    "thoughts": "用户希望查询成都锦官阁项目中2023年签约且合同总价最高的5个房间信息。核心字段为房间名称 `roomname` 和合同总价 `contrtotalprice`，并按总价降序排列，限制前5个结果。为增加背景信息，选择 `buildname`（楼栋名称）、`formatname`（业态名称）、`propertyconsultant`（置业顾问名称）和 `custtype`（客户类型）等字段。这些字段提供房间所在楼栋、业态类型、负责顾问及客户类型的辅助信息，帮助用户全面了解房间的其他相关属性。为能够清晰地展示各房间总价的相对大小，display_type设为response_bar_chart。",
-    "sql": "SELECT roomname, CAST(contrtotalprice AS numeric) AS total_contract_price, buildname, formatname, propertyconsultant, custtype FROM fdc_dwd.dwd_trade_roomsign_a_min WHERE projname = '成都锦官阁' AND signdate >= '2023-01-01' AND signdate < '2024-01-01' AND partitiondate=current_date ORDER BY total_contract_price DESC LIMIT 5;",
-    "key_fields": "roomname, total_contract_price",
-    "display_type": "response_bar_chart"
-}
+如下给出示例：
+<few_shots>
 """
 
 mategen_dict = {}
@@ -92,25 +87,17 @@ def chat():
         print("显示当前所有会话id：")
         for m in mategen_dict.keys():
             print(m)
-        
+
+        # 获取用户输入的query字段
+        query = data.get("query")
+        print("\n\n++++++++++++++++++++++++++++++")
+        print(f"用户文本提问：{query}")
         # 获取当前会话id
         session_id = data.get("session_id")
         if session_id in mategen_dict:
             mategen = mategen_dict[session_id]
         else:
             is_new = True
-            mategen = MateGen(
-                api_key=os.getenv("OPENAI_API_KEY"),
-                base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
-                model="qwen2.5-72b-instruct",
-                system_content_list=[system_prompt_common],
-            )
-            mategen_dict[session_id] = mategen
-
-        # 获取用户输入的query字段
-        query = data.get("query")
-        print("\n\n++++++++++++++++++++++++++++++")
-        print(f"用户文本提问：{query}")
 
         try:
             # 暂时使用从请求的dataSource字段中获取used_tables，后续实现根据session_id查华菁数据库获取used_tables信息
@@ -139,6 +126,15 @@ def chat():
 
             # 根据used_tables拼接获得数据字典
             data_dictionary_md = query_tables_description(used_tables)
+            few_shots = query_few_shots(used_tables)
+
+            mategen = MateGen(
+                api_key=os.getenv("OPENAI_API_KEY"),
+                base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+                model="qwen2.5-72b-instruct",
+                system_content_list=[system_prompt_common.replace("<few_shots>",few_shots)],
+            )
+            mategen_dict[session_id] = mategen
 
             # 更换messages对象对应的数据字典部分
             mategen.replace_data_dictionary(data_dictionary_md)
@@ -146,12 +142,7 @@ def chat():
             # 加载历史会话记录
             mategen.add_session_messages(session_messages)
 
-        # 开启一次新的对话
-        if query == "reset":
-            mategen.reset()
-            return jsonify({"response": "已删除历史对话信息"})
-
-        # 调用chat函数，返回message消息
+        # 调用chat函数，返回chat_dict，记录函数执行过程的返回值
         chat_dict = mategen.chat(query)
 
         def generate_012(chat_dict):
