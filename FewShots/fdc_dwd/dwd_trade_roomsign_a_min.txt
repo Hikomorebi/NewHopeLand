@@ -1,0 +1,8 @@
+问题：查询成都锦官阁签约日期在2023年合同总价最高的5个房间的房间名称和合同总价。
+回答：
+{
+    "thoughts": "用户希望查询成都锦官阁项目中2023年签约且合同总价最高的5个房间信息。核心字段为房间名称 `roomname` 和合同总价 `contrtotalprice`，并按总价降序排列，限制前5个结果。为增加背景信息，选择 `buildname`（楼栋名称）、`formatname`（业态名称）、`propertyconsultant`（置业顾问名称）和 `custtype`（客户类型）等字段。这些字段提供房间所在楼栋、业态类型、负责顾问及客户类型的辅助信息，帮助用户全面了解房间的其他相关属性。为能够清晰地展示各房间总价的相对大小，display_type设为response_bar_chart。",
+    "sql": "SELECT roomname, CAST(contrtotalprice AS numeric) AS total_contract_price, buildname, formatname, propertyconsultant, custtype FROM fdc_dwd.dwd_trade_roomsign_a_min WHERE projname = '成都锦官阁' AND signdate >= '2023-01-01' AND signdate < '2024-01-01' AND partitiondate=current_date ORDER BY total_contract_price DESC LIMIT 5;",
+    "key_fields": "roomname, total_contract_price",
+    "display_type": "response_bar_chart" 
+}

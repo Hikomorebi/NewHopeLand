@@ -7,7 +7,7 @@ def post_chat(query):
     # 接口地址
     url = "http://me.ilisa.team:45108/chat"
     headers = {"Content-Type": "application/json"}
-    data = {"session_id":"1","query": query,"dataSource":'{"fdc_dwd":["dwd_trade_roomsign_a_min"]}',"availableTables":""}
+    data = {"session_id":"1","query": query,"dataSource":''}
 
     try:
         response = requests.post(url, headers=headers, data=json.dumps(data))

@@ -524,6 +524,32 @@ def dws_connect(sql_query,key_fields,display_type):
 
     return dws_connect_dict
 
+def dws_connect_test(sql_query):
+    connection = psycopg2.connect(
+        dbname="fdc_dc",
+        user="dws_user_hwai",
+        password="NewHope#1982@",
+        host="124.70.57.67",
+        port="8000",
+    )
+    connection.set_client_encoding('UTF8')
+    print("连接成功")
+
+    try:
+        with connection.cursor() as cursor:
+            start_time = time.time()
+            cursor.execute(sql_query)
+
+            results = cursor.fetchall()
+            end_time = time.time()
+            elapsed_time = end_time - start_time
+            print(f"查询耗时{elapsed_time}秒")
+            print(results)
+    except Exception as e:
+        print(str(e))
+    finally:
+        connection.close()
+
 def extract_json_fields(input_string):
     # Use regex to find potential JSON parts in the input string
     json_matches = re.findall(r"{.*?}", input_string, re.DOTALL)
@@ -570,6 +596,28 @@ def query_tables_description(database_dir_mapping):
 
     return "".join(result)
 
+def query_few_shots(database_dir_mapping):
+    """
+    根据传入的数据库和表名字典，拼接相应表的描述文件内容
+    :param database_dir_mapping: 字典，键为数据库名，值为表名列表
+    :return: 拼接的描述文件内容
+    """
+    result = []
+
+    for db_name, tables in database_dir_mapping.items():
+        db_dir = os.path.join("FewShots", db_name)  # 假设目录名就是数据库名
+        for table in tables:
+            table_file = os.path.join(db_dir, f"{table}.txt")  # 表名加上txt后缀构成文件名
+            try:
+                with open(table_file, "r", encoding="utf-8") as f:
+                    content = f.read()
+                    result.append(f"--- {db_name}.{table} ---\n{content}\n")
+            except FileNotFoundError:
+                print(f"表 {table} 在数据库 {db_name} 中找不到描述文件 {table_file}")
+            except Exception as e:
+                print(f"读取文件 {table_file} 时发生错误: {e}")
+
+    return "".join(result)
 
 def get_used_tables(current_session_id):
     # TODO
@@ -629,4 +677,4 @@ def dict_intersection(dict1, dict2):
     
     return result
 if __name__ == "__main__":
-    dws_connect("SELECT roomname, CAST(contrtotalprice AS numeric) AS total_contract_price, buildname, formatname, propertyconsultant, custtype FROM fdc_dwd.dwd_trade_roomsign_a_min WHERE projname = '成都锦官阁' AND signdate >= '2023-01-01' AND signdate < '2024-01-01' AND partitiondate=current_date ORDER BY total_contract_price DESC LIMIT 5;")
+    dws_connect_test("select subtosign_period/newvisittosub_num as subtosignavgcycle,subtosign_num as subtosignunits from fdc_ads.ads_salesreport_subscranalyse_a_min where statdate = current_date")
