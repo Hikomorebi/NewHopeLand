@@ -116,6 +116,8 @@ class MateGen:
             if process_user_input_dict["status"] == 1:
                 sql_code = process_user_input_dict["preset_sql"]
                 self.messages.messages_append(user_message)
+                key_fields = None
+                display_type = "response_bar_chart"
             else:
                 indicator_message = copy.deepcopy(self.messages)
                 if process_user_input_dict["status"] == 2:
@@ -190,6 +192,16 @@ class MateGen:
                     {
                         "role": "assistant",
                         "content": "针对当前问题无法为您生成可用的查询。",
+                    }
+                )
+                return chat_dict
+            elif sql_exec_dict["status"] == 2:
+                chat_dict["status"] = 1
+                chat_dict["gpt_response"] = "针对该问题，查询结果为空。"
+                self.messages.messages_append(
+                    {
+                        "role": "assistant",
+                        "content": "针对该问题，查询结果为空。",
                     }
                 )
                 return chat_dict

@@ -1,0 +1,8 @@
+问题：查询2023年武汉锦粼九里项目第一季度中每月的计划签约金额和计划回款金额。
+回答：
+{
+	"thoughts": "用户希望查询2023年武汉锦粼九里项目第一季度中每月的计划签约金额和计划回款金额，以便了解该项目在前三个月的财务计划。选择了 m1plansignamount、m2plansignamount、m3plansignamount 和 m1planrefundamount、m2planrefundamount、m3planrefundamount 字段，来展示每月的计划签约金额和计划回款金额。同时选择 cityname 和 projname 字段，以便明确数据所属的城市和项目。",
+	"sql": "SELECT cityname, projname, m1plansignamount AS Jan_plansign_amount, m2plansignamount AS Feb_plansign_amount, m3plansignamount AS Mar_plansign_amount, m1planrefundamount AS Jan_planrefund_amount, m2planrefundamount AS Feb_planrefund_amount, m3planrefundamount AS Mar_planrefund_amount FROM fdc_dws.dws_proj_projplansum_a_h WHERE projname = '武汉锦粼九里' AND years = '2023' AND partitiondate = CURRENT_DATE;",
+	"key_fields": "m1plansignamount, m2plansignamount, m3plansignamount,m1planrefundamount, m2planrefundamount, m3planrefundamount",
+	"display_type": "response_bar_chart"
+}

@@ -166,6 +166,7 @@ def chat():
         def generate_3(chat_dict):
             current_conversation = []
             stream = chat_dict["response_message_stream"]
+            yield json.dumps(used_tables)
 
             for data in stream:
                 json_data = json.loads(data)

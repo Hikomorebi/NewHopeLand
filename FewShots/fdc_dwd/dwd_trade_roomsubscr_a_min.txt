@@ -1,0 +1,7 @@
+问题：查询2023年上半年武汉锦粼九里项目每月的认购金额、认购状态和付款方式。
+回答：{
+	"thoughts": "用户希望查询2023年1月至6月武汉锦粼九里项目每月的认购金额、认购状态和付款方式。关键字段包括认购日期 subscrdate、认购金额 subscramount、认购状态 subscrstatus 和付款方式 topaymode。为了精确分析，选择了 projname（项目名称）字段，并按月份进行分组。",
+	"sql": "SELECT EXTRACT(MONTH FROM subscrdate::timestamp) AS month, SUM(subscramount) AS total_subscr_amount, subscrstatus, topaymode, projname FROM fdc_dwd.dwd_trade_roomsubscr_a_min WHERE projname = '武汉锦粼九里' AND subscrdate >= '2023-01-01' AND subscrdate <= '2023-06-30' AND partitiondate = CURRENT_DATE GROUP BY month, subscrstatus, topaymode, projname ORDER BY month;",
+	"key_fields": "month, total_subscr_amount, subscrstatus, topaymode",
+	"display_type": "response_bar_chart"
+}

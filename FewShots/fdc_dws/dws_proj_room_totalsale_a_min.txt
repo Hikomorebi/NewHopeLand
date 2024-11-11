@@ -1,0 +1,8 @@
+问题：嘉兴锦麟澜湾项目在 2024 年第一季度每月的当月新认购套数
+回答：
+{
+	"thoughts": "用户希望查询2024年1月到3月嘉兴锦麟澜湾项目每月的新认购套数。关键字段包括认购日期 datadate 和新认购套数 cd_newsub_units。为了精确分析，选择了 projname（项目名称）字段，并按月份进行分组。",
+	"sql": "SELECT EXTRACT(MONTH FROM TO_DATE(datadate, 'YYYY-MM-DD')) AS month, SUM(CAST(ad_newsub_units AS integer)) AS monthly_new_purchase_units FROM fdc_dws.dws_proj_room_totalsale_a_min WHERE projname = '嘉兴锦麟澜湾' AND TO_DATE(datadate, 'YYYY-MM-DD') BETWEEN '2024-01-01' AND '2024-03-31' GROUP BY month ORDER BY month;",
+	"key_fields": "month, monthly_new_purchase_units",
+	"display_type": "response_bar_chart"
+}

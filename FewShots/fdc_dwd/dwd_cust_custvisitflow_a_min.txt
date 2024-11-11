@@ -1,0 +1,7 @@
+问题：查询2023年武汉锦粼九里项目前六个月每月的来访人数和成交途径。
+回答： 
+{ 
+	"thoughts": "用户希望查询2023年武汉锦粼九里项目前六个月的来访人数和成交途径。关键字段包括来访日期 visitdate、来访人数 visitorcount 和成交途径 tradechannel。为了帮助用户更好地分析，选择了 projname（项目名称）、channelname（渠道名称）、propertyconsultantname（置业顾问名称）等辅助字段，以便对来访人数和成交途径做出更精细化的分析。",
+	 "sql": "SELECT EXTRACT(MONTH FROM visitdate::timestamp) AS month, SUM(visitorcount) AS total_visitor_count,  tradechannel, projname,  channelname,  propertyconsultantname FROM fdc_dwd.dwd_cust_custvisitflow_a_min WHERE projname = '武汉锦粼九里'  AND visitdate >= '2023-01-01'  AND visitdate <= '2023-06-30'  AND partitiondate = CURRENT_DATE  GROUP BY month, tradechannel, projname, channelname, propertyconsultantname  ORDER BY month;", 
+	"key_fields": "month, total_visitor_count, tradechannel", 
+	"display_type": "response_bar_chart" }

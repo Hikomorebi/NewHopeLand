@@ -1,0 +1,8 @@
+问题：查询武汉锦粼九里项目2023年内的认购未签金额总和。
+回答： 
+{ 
+	"thoughts": "用户希望查询武汉锦粼九里项目2023年内的认购未签金额总和。关键字段为 subunsign_amount（认购未签金额），并且需要对2023年内的数据进行汇总。查询条件是statdate在2023年内。",
+	 "sql": "SELECT SUM(subunsign_amount) AS total_uncontracted_amount FROM fdc_ads.ads_salesreport_subscranalyse_a_min WHERE orgname = '武汉锦粼九里' AND statdate >= '2023-01-01' AND statdate < '2024-01-01'", 
+	"key_fields": "total_uncontracted_amount", 
+	"display_type": "response_bar_chart" 
+}

@@ -461,10 +461,7 @@ def process_user_input(user_question):
             process_user_input_dict["user_question"] = user_question
             return process_user_input_dict
 
-def dws_connect(sql_query,key_fields,display_type):
-    if key_fields is None:
-        key_fields=""
-    key_field_words = [word.strip() for word in key_fields.split(',')]
+def dws_connect(sql_query,key_fields=None,display_type="response_bar_chart"):
     # status : 0表示sql执行报错,1表示正常返回结果，2表示查询结果为空
     dws_connect_dict = {}
     connection = psycopg2.connect(
@@ -488,12 +485,16 @@ def dws_connect(sql_query,key_fields,display_type):
             print(f"查询耗时{elapsed_time}秒")
             column_description = cursor.description
             column_names, type_codes = zip(*((des[0], des[1]) for des in column_description))
-
-            positions = {i for i, word in enumerate(column_names) if word in key_field_words}
+            if key_fields is None or key_fields=="":
+                positions = set(range(len(column_names)))
+            else:
+                key_field_words = [word.strip() for word in key_fields.split(',')]
+                positions = {i for i, word in enumerate(column_names) if word in key_field_words}
 
             results_length = len(results)
             if results_length==0:
                 dws_connect_dict["status"] = 2
+                dws_connect_dict["is_long"] = False
                 connection.close()
                 return dws_connect_dict
 
@@ -677,4 +678,5 @@ def dict_intersection(dict1, dict2):
     
     return result
 if __name__ == "__main__":
-    dws_connect_test("select subtosign_period/newvisittosub_num as subtosignavgcycle,subtosign_num as subtosignunits from fdc_ads.ads_salesreport_subscranalyse_a_min where statdate = current_date")
+    dws_connect_test("SELECT pdsign_cdrcvd AS 往日签约当日回款, pdsign_cdrcvd_qyh AS 往日签约当日回款_权益后, pwsign_cwrcvd AS 往周签约当周回款, pwsign_cwrcvd_qyh AS 往周签约当周回款_权益后, pmsign_cmrcvd AS 往月签约当月回款, pmsign_cmrcvd_qyh AS 往月签约当月回款_权益后, pqsign_cqrcvd AS 往季签约当季回款, pqsign_cqrcvd_qyh AS 往季签约当季回款_权益后, pysign_cyrcvd AS 往年签约当年回款, pysign_cyrcvd_qyh AS 往年签约当年回款_权益后 FROM fdc_dws.dws_proj_room_totalsale_a_min WHERE datadate=current_date AND projname = '广佛金沙公馆';")
+    #dws_connect_test("select subtosign_period/newvisittosub_num as subtosignavgcycle,subtosign_num as subtosignunits from fdc_ads.ads_salesreport_subscranalyse_a_min where statdate = current_date")

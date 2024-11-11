@@ -1,0 +1,8 @@
+问题：查询2023年武汉锦粼九里项目中，按楼栋分类的应收金额总和（含税）。
+回答：
+{
+    "thoughts": "用户希望查询武汉锦粼九里项目在2023年中的每个楼栋的应收金额总和，包含税收，并按应收金额降序排列。增加 `projname`（项目名称）字段有助于确认对应的项目，同时按金额降序排列有助于查看应收金额最高的楼栋。",
+    "sql": "SELECT projname, buildname, SUM(recvbldebtamounttax) AS total_receivable_tax_included FROM fdc_dwd.dwd_trade_roomreceivable_a_min WHERE projname = '武汉锦粼九里' AND recvbldebtdate >= '2023-01-01' AND recvbldebtdate <= '2023-12-31' AND partitiondate = CURRENT_DATE GROUP BY projname, buildname ORDER BY total_receivable_tax_included DESC;",
+    "key_fields": "buildname, total_receivable_tax_included",
+    "display_type": "response_bar_chart"
+}
