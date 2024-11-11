@@ -7,7 +7,7 @@ def post_chat(query):
     # 接口地址
     url = "http://me.ilisa.team:45108/chat"
     headers = {"Content-Type": "application/json"}
-    data = {"session_id":"1","query": query,"dataSource":'{"fdc_dwd":["dwd_trade_roomsign_a_min"]}'}
+    data = {"session_id":"1","query": query,"dataSource":'{"fdc_dwd":["dwd_trade_roomsign_a_min"]}',"availableTables":""}
 
     try:
         response = requests.post(url, headers=headers, data=json.dumps(data))
@@ -24,7 +24,7 @@ def post_chat(query):
                 content = "".join(content)
                 sql_code = re.findall(r'"sql_code": "(.*?)"', anwser)
                 sql_code = "".join(sql_code)
-                sql_response = re.findall(r'"sql_response": \[.*\]', anwser)
+                sql_response = re.findall(r'"sql_response": \{.*\}', anwser)
                 sql_response = "".join(sql_response)
                 # thoughts = re.findall(r'"thoughts": "(.*?)"', anwser)
                 # thoughts = "".join(thoughts)
@@ -41,4 +41,4 @@ def post_chat(query):
         print("Exception occurred:", str(e))
 
 
-post_chat("查询成都锦官阁签约日期在2023年合同总价最高的5个房间的房间名称和合同总价")
+post_chat("2017年成都皇冠湖壹号签了多少套新房？")
