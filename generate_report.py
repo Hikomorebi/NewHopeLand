@@ -25,6 +25,7 @@ few_shot_examples = '''
             "客户姓名": "卢女士",
             "首复访": "首访",
             "年龄": "未知",
+            "诚意度": "E",
             "家庭人数": "未知",
             "置业次数": "未知",
             "意向面积": "洋房",
@@ -74,6 +75,7 @@ few_shot_examples = '''
             "客户姓名": "张女士",
             "首复访": "首访",
             "年龄": "30",
+            "诚意度": "C",
             "家庭人数": "2",
             "置业次数": "首次",
             "意向面积": "90-100m²",
@@ -123,6 +125,7 @@ few_shot_examples = '''
             "客户姓名": "李先生",
             "首复访": "首访",
             "年龄": "40",
+            "诚意度": "D",
             "家庭人数": "4",
             "置业次数": "首次",
             "意向面积": "120m²",
@@ -172,6 +175,7 @@ few_shot_examples = '''
             "客户姓名": "关吕静",
             "首复访": "首访",
             "年龄": "未知",
+            "诚意度": "A",
             "家庭人数": "未知",
             "置业次数": "未知",
             "意向面积": "洋房",
@@ -220,6 +224,7 @@ few_shot_examples = '''
             "客户姓名": "崔先生",
             "首复访": "首访",
             "年龄": "未知",
+            "诚意度": "B",
             "家庭人数": "未知",
             "置业次数": "未知",
             "意向面积": "120",
@@ -261,7 +266,59 @@ few_shot_examples = '''
             }
         ],
         "意向等级": "B - 高意向"
-    }
+    }，
+    {   请根据以下客户的基本信息，生成有针对性的成交卡点、后续跟进计划以及意向等级：
+
+        "客户基本信息总结": {
+            "接待销售": "张丽",
+            "来访渠道": "自然来访",
+            "客户姓名": "戴先生",
+            "首复访": "首访",
+            "年龄": "未知",
+            "诚意度": "D",
+            "家庭人数": "未知",
+            "置业次数": "首次",
+            "意向面积": "110-120m²",
+            "预期价格": "260-280万",
+            "预期折扣": "未知",
+            "首付预算": "未知",
+            "关注点1": "地段",
+            "关注点2": "升值潜力",
+            "对比竞品": "未知",
+            "未成交原因": "户型",
+            "客户情况补充": "戴先生看商铺投资，面积太大了！位置也不喜欢，想买100左右的商铺，投资",
+            "最新跟进反馈": "便宜，肯定接受"
+        },
+        "成交卡点分析": {
+            "1. 面积过大": "戴先生认为现有的商铺面积（130m²）过大，不符合他的投资需求。",
+            "2. 位置不满意": "戴先生对当前商铺的位置不满意，希望找到更符合他需求的位置。",
+            "3. 户型问题": "戴先生对现有商铺的户型不满意，可能影响他的投资决策。",
+            "4. 价格敏感": "戴先生对价格非常敏感，希望价格能够更加合理。"
+        },
+        "后续跟进计划": [
+            {
+                "时间": "一周内",
+                "内容": "整理并提供符合戴先生需求的100平方米左右的商铺房源信息，包括位置、价格、户型等详细资料。",
+                "方式": "通过电话或微信联系戴先生，发送相关资料。"
+            },
+            {
+                "时间": "两周内",
+                "内容": "邀请戴先生实地考察推荐的商铺，现场了解商铺的具体情况。",
+                "方式": "提前预约，确保戴先生的时间安排。"
+            },
+            {
+                "时间": "每月一次",
+                "内容": "定期与戴先生沟通，了解他对推荐商铺的意见和建议，及时调整推荐方案。",
+                "方式": "电话或微信联系。"
+            },
+            {
+                "时间": "长期",
+                "内容": "持续关注市场上的优质商铺资源，一旦发现符合戴先生需求的新房源，立即通知他。",
+                "方式": "建立客户档案，定期更新市场信息。"
+            }
+        ],
+        "意向等级": "D - 低意向"
+    }   
 ]
 '''
 
@@ -281,14 +338,14 @@ def generate_model_suggestions_and_rank(customer_data):
     - "成交卡点分析": 列表，每个元素包含卡点和详细说明
     - "后续跟进计划": 列表，每个元素包含时间、内容、方式
     - "意向等级": 字符串，表示客户的意向等级
-    请确保输出格式为json格式。
+    以严格的课直接处理的JSON字符串格式输出。
     意向等级包括：
     A - 认购
     B - 高意向
     C - 一般意向
     D - 低意向
     E - 无意向
-    - 后续跟进计划能直接对应一个或多个成交卡点，同时要针对客户的具体情况，要提出切实可行的行动方案。
+    - 后续跟进计划最好能直接对应一个或多个成交卡点，同时要针对客户的具体情况，要提出切实可行的行动方案。
     """
 
     try:
@@ -341,7 +398,7 @@ def query_customer_info(saleropenid, start_date, end_date):
                         ranked_customers
                     WHERE 
                         row_num = 1
-                    LIMIT 1;
+                    LIMIT 1;                      
             """
             cursor.execute(sql, (saleropenid, start_date, end_date))
             result = cursor.fetchall()
@@ -366,16 +423,21 @@ def generate_markdown_report(customers, saleropenid):
     report_json_match = re.search(r"\{[\s\S]*\}", report)
     if report_json_match:
         json_report = report_json_match.group()
-        print(json_report)
     else:
         json_report = ""
     filtered_report = filter_report(json_report)
-    string_report = json.dumps(filtered_report, ensure_ascii=False, indent=4)
+    return filtered_report
+
+    md_report = convert_report_to_markdown(filtered_report)
+    '''string_report = json.dumps(md_report, ensure_ascii=False, indent=4)
     string_report_data = json.loads(string_report)
     start = report.index('{')
     end = report.rindex('}') + 1
-    report = report[:start] + json.dumps(string_report_data, ensure_ascii=False, indent=4) + report[end:]
-    return report
+    report = report[:start] + json.dumps(string_report_data, ensure_ascii=False, indent=4) + report[end:]'''
+    pre = "# 高意向客户分析报告\n"
+    pre += f"## 置业顾问ID: {saleropenid}\n\n"
+    md_report_pre = pre + md_report
+    return md_report_pre
 
 def filter_report(report):
     # 需要保留的客户基本信息的键
@@ -411,6 +473,40 @@ def filter_report(report):
 
     return filtered_report
 
+def convert_report_to_markdown(json_report):
+    data = json_report
+    # 客户基本信息总结
+    if "客户基本信息总结" in data:
+        markdown = "### 客户基本信息总结\n"
+        customer_info = data["客户基本信息总结"]
+        markdown += f"- **来访渠道**: {customer_info.get('来访渠道', '未知')}\n"
+        markdown += f"- **客户姓名**: {customer_info.get('客户姓名', '未知')}\n"
+        markdown += f"- **首复访**: {customer_info.get('首复访', '未知')}\n"
+        markdown += f"- **客户情况补充**: {customer_info.get('客户情况补充', '未知')}\n"
+        markdown += f"- **最新跟进反馈**: {customer_info.get('最新跟进反馈', '未知')}\n\n"
+
+    # 成交卡点分析
+    if "成交卡点分析" in data:
+        markdown += "### 成交卡点分析\n"
+        for idx, card in enumerate(data["成交卡点分析"], 1):
+            markdown += f"{idx}. **{card.get('卡点', '未知')}**: {card.get('详细说明', '未知')}\n"
+        markdown += "\n"
+
+    # 后续跟进计划
+    if "后续跟进计划" in data:
+        markdown += "### 后续跟进计划\n"
+        for plan in data["后续跟进计划"]:
+            markdown += f"- **时间**: {plan.get('时间', '未知')}\n"
+            markdown += f"  - **内容**: {plan.get('内容', '未知')}\n"
+            markdown += f"  - **方式**: {plan.get('方式', '未知')}\n\n"
+
+    # 意向等级
+    if "意向等级" in data:
+        markdown += "### 意向等级\n"
+        markdown += f"- **{data.get('意向等级', '未知')}**\n"
+
+    return markdown
+
 def main():
     saleropenid = input("请输入置业顾问ID: ")
     start_date = input("请输入起始日期 (格式: YYYY-MM-DD): ")
@@ -422,6 +518,8 @@ def main():
         return
 
     report = generate_markdown_report(customers, saleropenid)
+
+    return report
 
     report_filename = f"高意向客户分析报告_{saleropenid}.md"
     with open(report_filename, "w", encoding="utf-8") as file:

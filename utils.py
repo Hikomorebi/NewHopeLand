@@ -498,7 +498,7 @@ def dws_connect(sql_query,key_fields=None,display_type="response_bar_chart"):
                 connection.close()
                 return dws_connect_dict
 
-            if results_length > 100:
+            if results_length > 20:
                 dws_connect_dict["is_long"] = True
                 # sql_results = json.dumps(results[:50], ensure_ascii=False, default=default_converter)
             else:
@@ -678,5 +678,5 @@ def dict_intersection(dict1, dict2):
     
     return result
 if __name__ == "__main__":
-    dws_connect_test("SELECT pdsign_cdrcvd AS 往日签约当日回款, pdsign_cdrcvd_qyh AS 往日签约当日回款_权益后, pwsign_cwrcvd AS 往周签约当周回款, pwsign_cwrcvd_qyh AS 往周签约当周回款_权益后, pmsign_cmrcvd AS 往月签约当月回款, pmsign_cmrcvd_qyh AS 往月签约当月回款_权益后, pqsign_cqrcvd AS 往季签约当季回款, pqsign_cqrcvd_qyh AS 往季签约当季回款_权益后, pysign_cyrcvd AS 往年签约当年回款, pysign_cyrcvd_qyh AS 往年签约当年回款_权益后 FROM fdc_dws.dws_proj_room_totalsale_a_min WHERE datadate=current_date AND projname = '广佛金沙公馆';")
+    dws_connect_test("SELECT * FROM fdc_dws.dws_proj_room_totalsale_a_min WHERE projname = '广佛悦珑湾' AND datadate >= '2024-10-01' AND datadate < '2024-11-01' ORDER BY sign_amt DESC LIMIT 1;")
     #dws_connect_test("select subtosign_period/newvisittosub_num as subtosignavgcycle,subtosign_num as subtosignunits from fdc_ads.ads_salesreport_subscranalyse_a_min where statdate = current_date")

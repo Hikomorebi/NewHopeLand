@@ -12,9 +12,10 @@ from utils import (
     query_few_shots,
     get_session_messages,
     test_match,
-    dict_intersection
+    dict_intersection,
 )
 from auto_select_tables import select_table_based_on_query
+
 app = Flask(__name__)
 
 # 设置环境变量（仅在当前脚本运行期间有效）
@@ -48,34 +49,49 @@ system_prompt_common = """
 """
 
 mategen_dict = {}
-all_tables = {"fdc_ads":["ads_salesreport_subscranalyse_a_min","ads_salesreport_visitweekanalyse_a_min"],"fdc_dwd":["dwd_cust_custvisitflow_a_min","dwd_trade_roomreceivable_a_min","dwd_trade_roomsign_a_min","dwd_trade_roomsmsubscr_a_min","dwd_trade_roomsubscr_a_min"],"fdc_dws":["dws_proj_projplansum_a_h","dws_proj_room_totalsale_a_min"]}
+all_tables = {
+    "fdc_ads": [
+        "ads_salesreport_subscranalyse_a_min",
+        "ads_salesreport_visitweekanalyse_a_min",
+    ],
+    "fdc_dwd": [
+        "dwd_cust_custvisitflow_a_min",
+        "dwd_trade_roomreceivable_a_min",
+        "dwd_trade_roomsign_a_min",
+        "dwd_trade_roomsmsubscr_a_min",
+        "dwd_trade_roomsubscr_a_min",
+    ],
+    "fdc_dws": ["dws_proj_projplansum_a_h", "dws_proj_room_totalsale_a_min"],
+}
 
 print("Flask 启动！")
 
 
 @app.route("/match", methods=["POST"])
 def match():
-        data = request.json
-        query = data.get("query")
-        indicator_name = test_match(query)
-        if indicator_name:
-            return jsonify({"response": indicator_name})
-        else:
-            return jsonify({"response": "未匹配上指标"})
+    data = request.json
+    query = data.get("query")
+    indicator_name = test_match(query)
+    if indicator_name:
+        return jsonify({"response": indicator_name})
+    else:
+        return jsonify({"response": "未匹配上指标"})
+
 
 @app.route("/close", methods=["POST"])
 def close():
-        data = request.json
-        session_id = data.get("session_id")
-        print("******************************")
-        if session_id in mategen_dict:
-            del mategen_dict[session_id]
-            print(f"删除session_id:{session_id}")
-            return jsonify({"response": "已删除该会话"})
-        else:
-            print(f"没有该会话session_id:{session_id}")
-            return jsonify({"response": "不存在该会话"})
-        
+    data = request.json
+    session_id = data.get("session_id")
+    print("******************************")
+    if session_id in mategen_dict:
+        del mategen_dict[session_id]
+        print(f"删除session_id:{session_id}")
+        return jsonify({"response": "已删除该会话"})
+    else:
+        print(f"没有该会话session_id:{session_id}")
+        return jsonify({"response": "不存在该会话"})
+
+
 @app.route("/chat", methods=["POST"])
 def chat():
     try:
@@ -102,6 +118,8 @@ def chat():
         try:
             # 暂时使用从请求的dataSource字段中获取used_tables，后续实现根据session_id查华菁数据库获取used_tables信息
             chosen_tables = json.loads(data.get("dataSource"))
+            if isinstance(chosen_tables, list):
+                chosen_tables = None
         except Exception as e:
             # 捕获其他可能的错误
             print(str(e))
@@ -112,7 +130,6 @@ def chat():
         except Exception as e:
             print(str(e))
             available_tables = all_tables
- 
 
         # 如果请求中会话id发生变化，则说明切换会话或开启新会话，需要重新加载历史会话
         if is_new:
@@ -122,7 +139,7 @@ def chat():
             # 根据session_id获取使用到的表，查询华菁数据库nh_chat_history表中DATA_SET_JSON字段获取
             if chosen_tables is None:
                 chosen_tables = select_table_based_on_query(query)
-            used_tables = dict_intersection(chosen_tables,available_tables)
+            used_tables = dict_intersection(chosen_tables, available_tables)
 
             # 根据used_tables拼接获得数据字典
             data_dictionary_md = query_tables_description(used_tables)
@@ -132,7 +149,9 @@ def chat():
                 api_key=os.getenv("OPENAI_API_KEY"),
                 base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
                 model="qwen2.5-72b-instruct",
-                system_content_list=[system_prompt_common.replace("<few_shots>",few_shots)],
+                system_content_list=[
+                    system_prompt_common.replace("<few_shots>", few_shots)
+                ],
             )
             mategen_dict[session_id] = mategen
 
@@ -166,7 +185,7 @@ def chat():
         def generate_3(chat_dict):
             current_conversation = []
             stream = chat_dict["response_message_stream"]
-            yield json.dumps(used_tables)
+            # yield json.dumps(used_tables)
 
             for data in stream:
                 json_data = json.loads(data)
@@ -214,13 +233,10 @@ def analysis():
 
         customers = query_customer_info(saleropenid, start_date, end_date)
         if not customers:
+            print("未查询到相关客户信息。")
             return jsonify({"status": "error", "response": "未查询到相关客户信息。"})
 
         report = generate_markdown_report(customers, saleropenid)
-
-        report_filename = f"高意向客户分析报告_{saleropenid}.md"
-        with open(report_filename, "w", encoding="utf-8") as file:
-            file.write(report)
 
         return jsonify({"status": "success", "response": report})
 
@@ -230,4 +246,4 @@ def analysis():
 
 
 if __name__ == "__main__":
-    app.run(threaded=True,host="0.0.0.0", port=45108)
+    app.run(threaded=True, host="0.0.0.0", port=45108)
