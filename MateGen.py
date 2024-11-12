@@ -52,7 +52,7 @@ def get_gpt_response(
         # 若不存在外部函数
         if available_functions is None or available_functions.functions_list is None:
             response = client.chat.completions.create(
-                model=model, messages=enhanced_messages.messages, temperature=0
+                model=model, messages=enhanced_messages.messages, temperature=0.01
             )
         # 若存在外部函数，此时functions和function_call参数信息都从AvailableFunctions对象中获取
         else:
@@ -75,7 +75,7 @@ def get_gpt_response(
 
 def get_gpt_response_stream(client, model, messages):
     stream = client.chat.completions.create(
-        model=model, messages=messages.messages, stream=True, temperature=0
+        model=model, messages=messages.messages, stream=True, temperature=0.01
     )
     for chunk in stream:
         if chunk.choices[0].delta.content is not None:
