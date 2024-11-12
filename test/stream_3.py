@@ -5,7 +5,7 @@ import re
 
 def post_chat():
     # 接口地址
-    url = "http://me.ilisa.team:45108/analysis"
+    url = "http://ilisa-team-np.natapp1.cc/analysis"
     headers = {"Content-Type": "application/json"}
     data = {"saleropenid":"oFUZO5xjO671mxo3fSQ3Fkldlaj8","start_date": "2023-01-01","end_date":'2024-10-10'}
 

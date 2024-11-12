@@ -41,4 +41,4 @@ def post_chat(query):
         print("Exception occurred:", str(e))
 
 
-post_chat("查询广佛金沙公馆在2024年内的往期签约回款是多少，给出具体值")
+post_chat("查询南宁锦官城在2017年的新增签约套数是多少，给出具体值")

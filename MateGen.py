@@ -9,7 +9,7 @@ from utils import (
     extract_json_fields,
     process_user_input,
     dws_connect,
-    get_indicator_data_dictionary
+    get_indicator_data_dictionary,
 )
 import json
 
@@ -19,8 +19,9 @@ system_prompt_indicator_template = """
 1. 请仔细阅读并理解用户的请求。参考数据库字典提供的表结构和各字段信息，根据计算规则生成正确的PostgreSQL语句。
 2. 如果计算规则已经是SQL语句，请完全按照提供的计算规则模板来设计SQL语句，不要无端自行增删或修改计算规则，同时需要从用户问题中提取相关的时间等信息来填充计算规则中带有'$'符号的占位符以生成完整正确的SQL语句。
 3. 请确保所有字段和条件都使用具体的值。禁止随意假设不存在的信息。要求生成的SQL语句能够直接运行。
+4. 如果数据字典中存在partitiondate字段表，请务必在生成SQL语句的筛选条件中加入partitiondate=current_date。
 4. 在从用户提问中提取项目名称时，项目名称可能包含城市名，应视为一个完整的字符串，不要拆分。如"成都皇冠湖壹号","温州立体城"才是完整的项目名称。
-请根据计算规则给出SQL代码，并按照以下JSON格式响应：
+请根据计算规则给出SQL代码，并按照以下JSON格式响应，要求只返回一个json对象，不要包含其余内容：
 {{
     "sql": "SQL Query to run",
 }}
@@ -51,7 +52,7 @@ def get_gpt_response(
         # 若不存在外部函数
         if available_functions is None or available_functions.functions_list is None:
             response = client.chat.completions.create(
-                model=model, messages=enhanced_messages.messages
+                model=model, messages=enhanced_messages.messages, temperature=0
             )
         # 若存在外部函数，此时functions和function_call参数信息都从AvailableFunctions对象中获取
         else:
@@ -74,7 +75,7 @@ def get_gpt_response(
 
 def get_gpt_response_stream(client, model, messages):
     stream = client.chat.completions.create(
-        model=model, messages=messages.messages, stream=True
+        model=model, messages=messages.messages, stream=True, temperature=0
     )
     for chunk in stream:
         if chunk.choices[0].delta.content is not None:
@@ -127,18 +128,28 @@ class MateGen:
                     system_prompt_indicator = system_prompt_indicator_template.format(
                         indicator_name=indicator_name,
                         indicator_field_name=indicator_data["指标字段名"],
-                        indicator_rule=indicator_data["计算规则"]
+                        indicator_rule=indicator_data["计算规则"],
                     )
                     indicator_tables = indicator_data["数据来源"]
-                    indicator_data_dictionary = get_indicator_data_dictionary(indicator_tables)
-                    if indicator_data_dictionary is None or indicator_data_dictionary == '':
+                    indicator_data_dictionary = get_indicator_data_dictionary(
+                        indicator_tables
+                    )
+                    if (
+                        indicator_data_dictionary is None
+                        or indicator_data_dictionary == ""
+                    ):
                         indicator_message.delete_system_messages_temp()
                         indicator_message.add_system_message_temp(
                             {"role": "system", "content": system_prompt_indicator}
                         )
                     else:
-                        indicator_system_messages = [{"role":"system","content":indicator_data_dictionary},{"role": "system", "content": system_prompt_indicator}]
-                        indicator_message.replace_system_message(indicator_system_messages)
+                        indicator_system_messages = [
+                            {"role": "system", "content": indicator_data_dictionary},
+                            {"role": "system", "content": system_prompt_indicator},
+                        ]
+                        indicator_message.replace_system_message(
+                            indicator_system_messages
+                        )
                     indicator_message.messages_append(user_message)
 
                     self.messages.messages_append(user_message)
@@ -163,7 +174,9 @@ class MateGen:
                 print(response_message.content)
                 print("============================================================")
                 # 解析出SQL代码和返回类型
-                sql_code, thoughts, key_fields, display_type  = extract_json_fields(response_message.content)
+                sql_code, thoughts, key_fields, display_type = extract_json_fields(
+                    response_message.content
+                )
                 if sql_code is None:
                     chat_dict["status"] = 1
                     chat_dict["gpt_response"] = response_message.content
@@ -184,7 +197,7 @@ class MateGen:
 
             # 执行SQL语句
             # status : 0表示sql执行报错,1表示正常返回结果，2表示查询结果为空
-            sql_exec_dict = dws_connect(sql_code,key_fields,display_type)
+            sql_exec_dict = dws_connect(sql_code, key_fields, display_type)
             if sql_exec_dict["status"] == 0:
                 chat_dict["status"] = 2
                 chat_dict["sql_error_message"] = sql_exec_dict["error_message"]
