@@ -11,7 +11,7 @@ client = OpenAI(
     api_key=os.getenv("OPENAI_API_KEY"),
     base_url="https://dashscope.aliyuncs.com/compatible-mode/v1"
 )
-model = 'qwen-max'
+model = 'qwen-plus'
 
 # 定义数据表
 tables_info = {
