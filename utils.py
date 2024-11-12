@@ -595,7 +595,7 @@ def query_tables_description(database_dir_mapping):
             except Exception as e:
                 print(f"读取文件 {table_file} 时发生错误: {e}")
 
-    return "".join(result)
+    return "这是地产销售数据字典：\n"+"".join(result)
 
 def query_few_shots(database_dir_mapping):
     """
@@ -678,5 +678,5 @@ def dict_intersection(dict1, dict2):
     
     return result
 if __name__ == "__main__":
-    dws_connect_test("SELECT * FROM fdc_dws.dws_proj_room_totalsale_a_min WHERE projname = '广佛悦珑湾' AND datadate >= '2024-10-01' AND datadate < '2024-11-01' ORDER BY sign_amt DESC LIMIT 1;")
+    dws_connect_test("select subtosign_period/NULLIF(newvisittosub_num,0) as subtosignavgcycle,subtosign_num as subtosignunits from fdc_ads.ads_salesreport_subscranalyse_a_min where statdate = current_date")
     #dws_connect_test("select subtosign_period/newvisittosub_num as subtosignavgcycle,subtosign_num as subtosignunits from fdc_ads.ads_salesreport_subscranalyse_a_min where statdate = current_date")

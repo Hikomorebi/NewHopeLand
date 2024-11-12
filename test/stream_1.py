@@ -7,7 +7,7 @@ def post_chat(query):
     # 接口地址
     url = "http://me.ilisa.team:45108/chat"
     headers = {"Content-Type": "application/json"}
-    data = {"session_id":"22","query": query,"dataSource":''}
+    data = {"session_id":"222","query": query,"dataSource":''}
 
     try:
         response = requests.post(url, headers=headers, data=json.dumps(data))
@@ -41,4 +41,4 @@ def post_chat(query):
         print("Exception occurred:", str(e))
 
 
-post_chat("查询成都枫山美地的房间编号为DFF3C86F-2E8C-E511-93F2-90B11C25CCB5的房间名称是什么")
+post_chat("查询认购转签约套数是多少？")
