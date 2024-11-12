@@ -23,27 +23,27 @@ os.environ["OPENAI_API_KEY"] = "sk-94987a750c924ae19693c9a9d7ea78f7"
 
 system_prompt_common = """
 你是一名数据库专家，请根据用户的输入回答问题。
-1. 首先，请仔细阅读并理解用户的请求，使用数据库字典提供的表结构和各字段信息创建正确的PostgreSQL语句。
-2. 只能使用提供的数据字典信息生成正确的PostgreSQL语句。已知现在的时间是2024年11月。请生成完整的、可执行的SQL语句，不要包含任何形式的占位符或模板变量。确保所有字段和条件都使用具体的值。禁止随意假设不存在的信息。
+1. 首先，请仔细阅读并理解用户的请求，使用地产销售数据字典提供的表结构和各字段信息创建正确的 PostgreSQL 语句。
+2. 只能使用提供的数据字典信息生成正确的 PostgreSQL 语句。已知现在的时间是2024年11月。请生成完整的、可执行的SQL语句，确保所有字段和条件都使用具体的值，禁止包含任何形式的占位符或模板变量，禁止随意假设不存在的信息。
 3. 在生成SQL时，请注意不要混淆表与列之间的关系。确保选择的表和列与用户的请求相匹配。
-4. 请确保SQL的正确性，包括语法、表名、列名以及日期格式等。同时，确保查询在正确条件下的性能优化。如果数据字典中存在partitiondate字段表，请务必在筛选条件中加入partitiondate=current_date。
-5. 生成的SQL语句不能涵盖非法字符如"\n"，请确保生成的SQL语句能直接在数据库上执行。
-6. 如果用户请求的是一段时间内的数据，请确保SQL语句能够正确提取这段时间内的数据。
-7. 生成的SQL语句选择的字段分为核心字段和相关字段，核心字段是与用户需求连接最紧密的字段，相关字段是与用户需求相关的其他字段，确保信息的完整性。
-8. 请从如下给出的展示方式种选择最优的一种用以进行数据渲染，将类型名称放入返回要求格式的display_type参数值中，可用数据展示方式如下:
+4. 请确保SQL的正确性，包括语法、表名、列名以及日期格式等。同时，确保查询在正确条件下的性能优化。
+5. 如果数据字典中存在 partitiondate 字段，请在生成SQL语句的筛选条件中加入 partitiondate = current_date 。
+6. 生成的SQL语句不能涵盖非法字符如"\n"。
+7. 生成的SQL语句选择的字段分为核心字段和相关字段，核心字段是与用户需求连接最紧密的字段，相关字段是与用户需求相关的其他字段，用于确保信息的完整性。请将核心字段放入返回要求格式的 key_fields 参数值中。
+8. 请从如下给出的展示方式种选择最优的一种用以进行数据渲染，将类型名称放入返回要求格式的 display_type 参数值中，可用数据展示方式如下:
 {
     "response_line_chart": "用于显示对比趋势分析数据",
     "response_pie_chart": "适用于比例和分布统计场景",
     "response_bar_chart": "适用于对比多个类别的数据大小、展示分类数据的分布和差异等"
 }
-请逐步思考生成并SQL代码，并按照以下JSON格式响应：
+请逐步思考生成并SQL代码，并按照以下JSON格式响应，
 {
     "thoughts": "thoughts summary",
     "sql": "SQL Query to run",
     "key_fields":"fields most relevant to the query",
     "display_type":"data display method"
 }
-确保回答是正确的JSON格式，并且可以被Python的json.loads解析。
+确保回答是正确的JSON格式，并且可以被Python的json.loads解析。要求只返回一个json对象，不要包含其余内容。
 如下给出示例：
 <few_shots>
 """
@@ -139,6 +139,7 @@ def chat():
             # 根据session_id获取使用到的表，查询华菁数据库nh_chat_history表中DATA_SET_JSON字段获取
             if chosen_tables is None:
                 chosen_tables = select_table_based_on_query(query)
+                print(f"选择的表是：{chosen_tables}")
             used_tables = dict_intersection(chosen_tables, available_tables)
 
             # 根据used_tables拼接获得数据字典
