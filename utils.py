@@ -271,7 +271,7 @@ def get_translate_column_names(column_names):
         base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
     )
     response = client.chat.completions.create(
-        model="qwen2.5-72b-instruct",
+        model="qwen-max",
         messages=[{"role": "user", "content": final_prompt}],
     )
     temp_dict = extract_json_from_response(response.choices[0].message.content)
@@ -361,7 +361,7 @@ def fuzzy_match_indicator(query, indicator_names):
         api_key=os.getenv("OPENAI_API_KEY"),
         base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
     )
-    model = "qwen2.5-72b-instruct"
+    model = "qwen-max"
 
     # 构建模型提示
     indicator_names_str = "\n".join([f"- {indicator}" for indicator in indicator_names])
