@@ -41,4 +41,4 @@ def post_chat(query):
         print("Exception occurred:", str(e))
 
 
-post_chat("查询认购转签约套数是多少？")
+post_chat("今日新签约的套数和面积是多少？")

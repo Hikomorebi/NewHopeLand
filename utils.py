@@ -421,10 +421,11 @@ def process_user_input(user_question):
 
     # 查询同义词
     synonyms = get_synonyms(cursor)  # 这里获取同义词字典
-    user_question = replace_synonyms(
-        user_question, synonyms
-    )  # 传入同义词字典
-    print(f"Modified question: {user_question}")
+    if synonyms:
+        user_question = replace_synonyms(
+            user_question, synonyms
+        )  # 传入同义词字典
+        print(f"Modified question: {user_question}")
 
     # 查询干预问题对应的SQL语句
     preset_sql = get_intervention_sql(cursor, user_question)
