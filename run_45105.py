@@ -193,7 +193,7 @@ def chat():
                 print(json_data)
                 if "content" in json_data:
                     current_conversation.append(json_data["content"])
-                    yield json.dumps(json_data)
+                    yield json.dumps(json_data)+'\n'
             final_response = "".join(current_conversation)
             mategen.messages.messages_append(
                 {"role": "assistant", "content": final_response}

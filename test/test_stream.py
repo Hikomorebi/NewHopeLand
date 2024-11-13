@@ -1,5 +1,4 @@
 import requests
-import json
 
 # 设置请求URL
 url = "http://127.0.0.1:45108/chat"  # 假设Flask应用运行在本地的5000端口

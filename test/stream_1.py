@@ -29,11 +29,10 @@ def post_chat(query):
                 # thoughts = re.findall(r'"thoughts": "(.*?)"', anwser)
                 # thoughts = "".join(thoughts)
                 print(data)
-                print("Response (raw):", anwser)
                 print("==========================================================================")
                 print("content:", content)
                 print("sql_code:", sql_code)
-                print("sql_response:", sql_response)
+                print("sql_response",json.dumps(json.loads(sql_response[15:-1]), indent=4,ensure_ascii=False))
                 # print("thoughts:", thoughts)
         else:
             print(f"Error: {response.status_code}, {response.text}")
@@ -41,4 +40,4 @@ def post_chat(query):
         print("Exception occurred:", str(e))
 
 
-post_chat("今日新签约的套数和面积是多少？")
+post_chat("查询广佛悦珑湾在2022年的计划签约金额是多少，给出具体值")

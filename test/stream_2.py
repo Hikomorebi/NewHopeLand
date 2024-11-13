@@ -7,7 +7,7 @@ def post_chat(query):
     # 接口地址
     url = "http://me.ilisa.team:45108/chat"
     headers = {"Content-Type": "application/json"}
-    data = {"session_id":"11214","query": query,"dataSource":'{"fdc_dwd":["dwd_trade_roomsign_a_min"]}'}
+    data = {"session_id":"222","query": query,"dataSource":''}
 
     try:
         response = requests.post(url, headers=headers, data=json.dumps(data))
@@ -24,20 +24,20 @@ def post_chat(query):
                 content = "".join(content)
                 sql_code = re.findall(r'"sql_code": "(.*?)"', anwser)
                 sql_code = "".join(sql_code)
-                sql_response = re.findall(r'"sql_response": \[.*\]', anwser)
+                sql_response = re.findall(r'"sql_response": \{.*\}', anwser)
                 sql_response = "".join(sql_response)
                 # thoughts = re.findall(r'"thoughts": "(.*?)"', anwser)
                 # thoughts = "".join(thoughts)
                 print(data)
-                print("Response (raw):", anwser)
                 print("==========================================================================")
                 print("content:", content)
                 print("sql_code:", sql_code)
-                print("sql_response:", sql_response)
+                print("sql_response",json.dumps(json.loads(sql_response[15:-1]), indent=4,ensure_ascii=False))
                 # print("thoughts:", thoughts)
         else:
             print(f"Error: {response.status_code}, {response.text}")
     except Exception as e:
         print("Exception occurred:", str(e))
 
-post_chat("查询成都皇冠湖壹号在2017年的套内面积是多少，给出具体值")
+
+post_chat("查询广佛悦珑湾在2022年的计划签约金额是多少，给出具体值")

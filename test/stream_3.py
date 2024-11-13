@@ -3,11 +3,11 @@ import json
 import re
 
 
-def post_chat():
+def post_chat(query):
     # 接口地址
-    url = "http://ilisa-team-np.natapp1.cc/analysis"
+    url = "http://me.ilisa.team:45108/chat"
     headers = {"Content-Type": "application/json"}
-    data = {"saleropenid":"oFUZO5xjO671mxo3fSQ3Fkldlaj8","start_date": "2023-01-01","end_date":'2024-10-10'}
+    data = {"session_id":"222","query": query,"dataSource":''}
 
     try:
         response = requests.post(url, headers=headers, data=json.dumps(data))
@@ -29,11 +29,10 @@ def post_chat():
                 # thoughts = re.findall(r'"thoughts": "(.*?)"', anwser)
                 # thoughts = "".join(thoughts)
                 print(data)
-                print("Response (raw):", anwser)
                 print("==========================================================================")
                 print("content:", content)
                 print("sql_code:", sql_code)
-                print("sql_response:", sql_response)
+                print("sql_response",json.dumps(json.loads(sql_response[15:-1]), indent=4,ensure_ascii=False))
                 # print("thoughts:", thoughts)
         else:
             print(f"Error: {response.status_code}, {response.text}")
@@ -41,4 +40,4 @@ def post_chat():
         print("Exception occurred:", str(e))
 
 
-post_chat()
+post_chat("查询广佛悦珑湾在2022年的计划签约金额是多少，给出具体值")
