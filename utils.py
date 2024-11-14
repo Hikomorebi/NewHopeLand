@@ -493,6 +493,9 @@ def dws_connect(sql_query,key_fields=None,display_type="response_bar_chart"):
                 positions = {i for i, word in enumerate(column_names) if word in key_field_words}
 
             results_length = len(results)
+            if results_length > 100:
+                results = results[:100]
+                results_length = 100
             if results_length==0:
                 dws_connect_dict["status"] = 2
                 dws_connect_dict["is_long"] = False
