@@ -7,7 +7,7 @@ def post_chat(query):
     # 接口地址
     url = "http://me.ilisa.team:45108/chat"
     headers = {"Content-Type": "application/json"}
-    data = {"session_id":"222","query": query,"dataSource":''}
+    data = {"session_id":"322","query": query,"dataSource":'{"fdc_dws":[dws_proj_room_totalsale_a_min]}'}
 
     try:
         response = requests.post(url, headers=headers, data=json.dumps(data))
@@ -40,4 +40,4 @@ def post_chat(query):
         print("Exception occurred:", str(e))
 
 
-post_chat("查询广佛悦珑湾在2022年的计划签约金额是多少，给出具体值")
+post_chat("成都新希望天府锦麟壹品当周的小订套数和金额分别是多少？")

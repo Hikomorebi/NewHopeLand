@@ -557,7 +557,8 @@ def dws_connect_test(sql_query):
 
 def extract_json_fields(input_string):
     # Use regex to find potential JSON parts in the input string
-    json_matches = re.findall(r"{.*?}", input_string, re.DOTALL)
+    # json_matches = re.findall(r"{.*?}", input_string, re.DOTALL)
+    json_matches = re.findall(r"\{(?:[^{}]*|\{(?:[^{}]*|\{[^{}]*\})*\})*\}", input_string, re.DOTALL)
     json_matches.reverse()
 
     for json_str in json_matches:
@@ -574,6 +575,7 @@ def extract_json_fields(input_string):
                 display_type = json_data.get("display_type","")
                 return sql, thoughts, key_fields, display_type
         except json.JSONDecodeError:
+            print("json.JSONDecodeError")
             continue  # Skip to the next match if there's a decoding error
 
     return None, None, None, None
@@ -682,5 +684,5 @@ def dict_intersection(dict1, dict2):
     
     return result
 if __name__ == "__main__":
-    dws_connect_test("select subtosign_period/NULLIF(newvisittosub_num,0) as subtosignavgcycle,subtosign_num as subtosignunits from fdc_ads.ads_salesreport_subscranalyse_a_min where statdate = current_date")
+    dws_connect_test("SELECT custname, mortgageloansum, projname, buildname, roomname, mortgagebank, mortgageyears, provfundloansum AS provident_fund_loan_sum FROM fdc_dwd.dwd_trade_roomsign_a_min WHERE partitiondate = current_date;")
     #dws_connect_test("select subtosign_period/newvisittosub_num as subtosignavgcycle,subtosign_num as subtosignunits from fdc_ads.ads_salesreport_subscranalyse_a_min where statdate = current_date")
