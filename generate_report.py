@@ -353,7 +353,7 @@ def generate_model_suggestions_and_rank(customer_data):
             model=model,
             messages=[{"role": "user", "content": prompt}]
         )
-        print(f"调用 API 成功！")
+        print("调用 API 成功！")
         return response.choices[0].message.content
     except Exception as e:
         print(f"调用 API 时出错: {e}")

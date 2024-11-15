@@ -109,7 +109,7 @@ class MateGen:
 
     def chat(self, question=None):
         # status:0表示大模型调用失败，1表示无需生成SQL语句，2表示生成SQL错误，3表示成功生成SQL语句
-        chat_dict = {}
+        chat_dict = {"time":"\n"}
         if question is not None:
             user_message = {"role": "user", "content": question}
             # todo:逻辑修改，需要先进行同义词解释，再进行问题干预和指标问数。
@@ -120,6 +120,7 @@ class MateGen:
             elapsed_time_chat = end_time_chat - start_time_chat
             print("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
             print(f"处理问题耗时: {elapsed_time_chat:.4f} 秒")
+            chat_dict["time"]+=f"处理问题耗时: {elapsed_time_chat:.4f} 秒\n"
             # 1 表示问题干预成功，直接得到SQL语句
             if process_user_input_dict["status"] == 1:
                 sql_code = process_user_input_dict["preset_sql"]
@@ -138,6 +139,7 @@ class MateGen:
                         indicator_rule=indicator_data["计算规则"],
                     )
                     indicator_tables = indicator_data["数据来源"]
+                    chat_dict["chosen_tables"] = {"tables":indicator_tables}
                     indicator_data_dictionary = get_indicator_data_dictionary(
                         indicator_tables
                     )
@@ -205,13 +207,15 @@ class MateGen:
             elapsed_time_get_sql = start_time_dws - end_time_chat
             print("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
             print(f"获取SQL语句耗时: {elapsed_time_get_sql:.4f} 秒")
+            chat_dict["time"]+=f"获取SQL语句耗时: {elapsed_time_get_sql:.4f} 秒\n"
             # 执行SQL语句
             # status : 0表示sql执行报错,1表示正常返回结果，2表示查询结果为空
             sql_exec_dict = dws_connect(sql_code, key_fields, display_type)
             end_time_dws = time.time()
             elapsed_time_dws = end_time_dws - start_time_dws
             print("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
-            print(f"执行dws_connect耗时: {elapsed_time_dws:.4f} 秒")
+            print(f"查询dws数据库并制作sql_response耗时: {elapsed_time_dws:.4f} 秒")
+            chat_dict["time"]+=f"查询dws数据库并制作sql_response耗时: {elapsed_time_dws:.4f} 秒\n"
             if sql_exec_dict["status"] == 0:
                 chat_dict["status"] = 2
                 chat_dict["sql_error_message"] = sql_exec_dict["error_message"]
