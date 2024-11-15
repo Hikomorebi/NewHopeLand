@@ -242,7 +242,11 @@ def chat():
 def analysis():
     try:
         data = request.json
-        saleropenid = data.get("saleropenid")
+        
+        # {"saler_id":"xxx","role_name":"销售主管"}
+        # {"saler_id":"xxx","role_name":"置业顾问"}
+        saleropenid = data.get("saler_id")
+        # 日期用 current_date 作为筛选条件
         start_date = data.get("start_date")
         end_date = data.get("end_date")
 
