@@ -1,9 +1,8 @@
-- 数据库名称
+- 数据表名称
 fdc_dwd.dwd_cust_custvisitflow_a_min
 
-- 数据库解释
-
-案场客户来访流水表。
+- 数据表解释
+案场客户来访流水表。查询该数据表时，请务必使用 partitiondate 筛选分区时期，若无特别说明，使用 partitiondate = current_date进行筛选。
 
 - 各字段说明
 
@@ -32,4 +31,3 @@ fdc_dwd.dwd_cust_custvisitflow_a_min
 | chanceid               | character varying               | 销售机会id        |
 | tradechannel           | character varying               | 成交途径          |
 | propertyconsultantname | character  varying              | 置业顾问          |
-

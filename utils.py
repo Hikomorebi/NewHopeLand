@@ -684,5 +684,6 @@ def dict_intersection(dict1, dict2):
     
     return result
 if __name__ == "__main__":
-    dws_connect_test("SELECT custname, mortgageloansum, projname, buildname, roomname, mortgagebank, mortgageyears, provfundloansum AS provident_fund_loan_sum FROM fdc_dwd.dwd_trade_roomsign_a_min WHERE partitiondate = current_date;")
+
     #dws_connect_test("select subtosign_period/newvisittosub_num as subtosignavgcycle,subtosign_num as subtosignunits from fdc_ads.ads_salesreport_subscranalyse_a_min where statdate = current_date")
+    dws_connect("SELECT projname, roomname, buildname, propertyconsultant, signdate FROM fdc_dwd.dwd_trade_roomsign_a_min WHERE custname = '聂安' AND signdate = '2017-08-31' AND partitiondate=current_date-1;")

@@ -1,6 +1,7 @@
 import os
 from openai import OpenAI
 import copy
+import time
 import traceback
 from ChatMessage import ChatMessages
 from utils import (
@@ -15,13 +16,14 @@ import json
 
 system_prompt_indicator_template = """
 {indicator_name}是一个需要计算的指标，它的字段名为{indicator_field_name}，计算规则为:
-{indicator_rule}；
+{indicator_rule};
 你是一名数据库专家，请根据计算规则生成正确的PostgreSQL语句。要求如下：
 1. 请仔细阅读并理解用户的请求。参考数据库字典提供的表结构和各字段信息，根据计算规则生成正确的PostgreSQL语句。
-2. 请完全按照提供的计算规则模板来设计SQL语句，不要修改计算规则的结构，同时如果计算规则中带有'$'符合作为占位符，需要从用户问题中提取相关的时间等信息来填充占位符。
+2. 请完全按照提供的计算规则模板来设计SQL语句，不要修改计算规则的结构，同时如果计算规则中带有'$'符合作为占位符，需要从用户问题中提取相关的时间等信息来填充占位符。请确保所有占位符都被具体的值填充。
 3. 请确保所有字段和条件都使用具体的值。禁止随意假设不存在的信息。请务必确保生成的SQL语句能够直接运行。
 4. 如果数据字典中存在 partitiondate 字段，请在生成SQL语句的筛选条件中加入 partitiondate = current_date 。如果计算规则中存在 partitiondate 字段，则将该字段值筛选条件设为 current_date 。
-5. 若用户提问中涉及项目名称，请提取项目名称作为筛选条件。项目名称可能包含城市名，应视为一个完整的字符串，不要拆分。如"成都皇冠湖壹号","温州立体城"才是完整的项目名称。
+5. 如果用户请求的是一段时间内的数据，请确保SQL语句能够正确提取这段时间内的数据。如询问当日的数据，可以使用 current_date 作为筛选条件。
+6. 若用户提问中涉及项目名称，请提取项目名称作为筛选条件。项目名称可能包含城市名，应视为一个完整的字符串，不要拆分。如"成都皇冠湖壹号","温州立体城"才是完整的项目名称。
 请严格按照计算规则的逻辑给出SQL代码，并按照以下JSON格式响应，要求只返回一个json对象，不要包含其余内容：
 {{
     "sql": "SQL Query to run",
@@ -112,8 +114,12 @@ class MateGen:
             user_message = {"role": "user", "content": question}
             # todo:逻辑修改，需要先进行同义词解释，再进行问题干预和指标问数。
             # 该函数直接判断是否为问题干预（1）、指标问数（2）、同义词解释（3）
+            start_time_chat = time.time()
             process_user_input_dict = process_user_input(question)
-
+            end_time_chat = time.time()
+            elapsed_time_chat = end_time_chat - start_time_chat
+            print("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
+            print(f"处理问题耗时: {elapsed_time_chat:.4f} 秒")
             # 1 表示问题干预成功，直接得到SQL语句
             if process_user_input_dict["status"] == 1:
                 sql_code = process_user_input_dict["preset_sql"]
@@ -195,10 +201,17 @@ class MateGen:
                         }
                     )
                     return chat_dict
-
+            start_time_dws = time.time()
+            elapsed_time_get_sql = start_time_dws - end_time_chat
+            print("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
+            print(f"获取SQL语句耗时: {elapsed_time_get_sql:.4f} 秒")
             # 执行SQL语句
             # status : 0表示sql执行报错,1表示正常返回结果，2表示查询结果为空
             sql_exec_dict = dws_connect(sql_code, key_fields, display_type)
+            end_time_dws = time.time()
+            elapsed_time_dws = end_time_dws - start_time_dws
+            print("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
+            print(f"执行dws_connect耗时: {elapsed_time_dws:.4f} 秒")
             if sql_exec_dict["status"] == 0:
                 chat_dict["status"] = 2
                 chat_dict["sql_error_message"] = sql_exec_dict["error_message"]

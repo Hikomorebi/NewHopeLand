@@ -3,7 +3,7 @@ fdc_dwd.dwd_trade_roomsmsubscr_a_min
 
 - 数据表解释
 
-房间小订信息表。
+房间小订信息表。查询该数据表时，请务必使用 partitiondate 筛选分区时期，若无特别说明，使用 partitiondate = current_date进行筛选。
 
 - 各字段说明
 
@@ -74,4 +74,3 @@ fdc_dwd.dwd_trade_roomsmsubscr_a_min
 | tradeclosereason    | character  varying | 交易关闭原因       |
 | invaliddate         | character  varying | 失效日期           |
 | partitiondate       | character  varying | 分区日期           |
-

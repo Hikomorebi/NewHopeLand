@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 from flask import Flask, Response, request, jsonify
 import os
+import time
 import traceback
 from MateGen import MateGen
 import json
@@ -24,13 +25,14 @@ os.environ["OPENAI_API_KEY"] = "sk-94987a750c924ae19693c9a9d7ea78f7"
 system_prompt_common = """
 你是一名数据库专家，请根据用户的输入回答问题。
 1. 首先，请仔细阅读并理解用户的请求，使用地产销售数据字典提供的表结构和各字段信息创建正确的 PostgreSQL 语句。
-2. 只能使用提供的数据字典信息生成正确的 PostgreSQL 语句。已知现在的时间是2024年11月。请生成完整的、可执行的SQL语句，确保所有字段和条件都使用具体的值，禁止包含任何形式的占位符或模板变量，禁止随意假设不存在的信息。
+2. 只能使用提供的数据字典信息生成正确的 PostgreSQL 语句。请生成完整的、可执行的SQL语句，确保所有字段和条件都使用具体的值，禁止包含任何形式的占位符或模板变量，禁止随意假设不存在的信息。
 3. 在生成SQL时，请注意不要混淆表与列之间的关系。确保选择的表和列与用户的请求相匹配。
 4. 请确保SQL的正确性，包括语法、表名、列名以及日期格式等。同时，确保查询在正确条件下的性能优化。
 5. 如果数据字典中存在 partitiondate 字段，请在生成SQL语句的筛选条件中加入 partitiondate = current_date 。
-6. 生成的SQL语句不能涵盖非法字符如"\n"。
-7. 生成的SQL语句选择的字段分为核心字段和相关字段，核心字段是与用户需求连接最紧密的字段，相关字段是与用户需求相关的其他字段，用于确保信息的完整性。请将核心字段放入返回要求格式的 key_fields 参数值中。
-8. 请从如下给出的展示方式种选择最优的一种用以进行数据渲染，将类型名称放入返回要求格式的 display_type 参数值中，可用数据展示方式如下:
+6. 如果用户请求的是一段时间内的数据，请确保SQL语句能够正确提取这段时间内的数据。如询问当日的数据，可以使用 current_date 作为筛选条件。如果问题涉及到今年或者本月，请自动理解为当前时间为2024年11月。
+7. 生成的SQL语句不能涵盖非法字符如"\n"。
+8. 生成的SQL语句选择的字段分为核心字段和相关字段，核心字段是与用户需求连接最紧密的字段，相关字段是与用户需求相关的其他字段，用于确保信息的完整性。请将核心字段放入返回要求格式的 key_fields 参数值中。
+9. 请从如下给出的展示方式种选择最优的一种用以进行数据渲染，将类型名称放入返回要求格式的 display_type 参数值中，可用数据展示方式如下:
 {
     "response_line_chart": "用于显示对比趋势分析数据",
     "response_pie_chart": "适用于比例和分布统计场景",
@@ -95,6 +97,7 @@ def close():
 @app.route("/chat", methods=["POST"])
 def chat():
     try:
+        start_time = time.time()
         global mategen_dict
         data = request.json
         is_new = False
@@ -163,7 +166,16 @@ def chat():
             mategen.add_session_messages(session_messages)
 
         # 调用chat函数，返回chat_dict，记录函数执行过程的返回值
+        before_chat_time = time.time()
+        elapsed_time = before_chat_time - start_time
+
+        print("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
+        print(f"对话准备耗时: {elapsed_time:.4f} 秒")
         chat_dict = mategen.chat(query)
+        after_chat_time = time.time()
+        elapsed_time_chat = after_chat_time - before_chat_time
+        print("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
+        print(f"执行chat函数耗时: {elapsed_time_chat:.4f} 秒")
 
         def generate_012(chat_dict):
             if chat_dict["status"] == 0:
@@ -206,6 +218,9 @@ def chat():
             }
             yield json.dumps(finish_info, default=default_converter)
 
+        end_time = time.time()
+        print("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
+        print(f"总共耗时: {end_time-start_time:.4f} 秒")
         if chat_dict["status"] != 3:
             return Response(generate_012(chat_dict), content_type="text/event-stream")
         else:
