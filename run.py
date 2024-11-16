@@ -61,10 +61,11 @@ system_prompt_indicator_template = """
 4. 如果数据字典中存在 partitiondate 字段，请在生成SQL语句的筛选条件中加入 partitiondate = current_date 。如果计算规则中存在 partitiondate 字段，则将该字段值筛选条件设为 current_date 。
 5. 如果用户请求的是一段时间内的数据，请确保SQL语句能够正确提取这段时间内的数据。如询问当日的数据，可以使用 current_date 作为筛选条件。
 6. 若用户提问中涉及项目名称，请提取项目名称作为筛选条件。项目名称可能包含城市名，应视为一个完整的字符串，不要拆分。如"成都皇冠湖壹号","温州立体城"才是完整的项目名称。
-请严格按照计算规则的逻辑给出SQL代码，并按照以下JSON格式响应，要求只返回一个json对象，不要包含其余内容：
+请严格按照计算规则的逻辑给出SQL代码，并按照以下JSON格式响应：
 {{
     "sql": "SQL Query to run",
 }}
+要求只返回最终的json对象，不要包含其余内容。
 """
 
 mategen_dict = {}
