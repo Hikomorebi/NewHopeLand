@@ -444,7 +444,6 @@ def process_user_input(user_question):
         # 查询华菁数据库获取所有指标名，以列表形式返回
         indicator_names = get_indicator_names(cursor)
 
-        # todo:需要修改，目前实现为精确匹配，第一阶段修改实现精准匹配失败后通过大语言模型实现模糊匹配，第二阶段实现向量匹配。
         indicator_name = match_indicator(user_question,indicator_names)
 
         if indicator_name:
@@ -655,7 +654,18 @@ def test_match(user_question):
     cursor.close()
     conn.close()
     return indicator_name
-
+def select_table_based_on_indicator(indicator_tables):
+    try:
+        table_str = indicator_tables.strip()
+        parts = table_str.split(".")
+        if len(parts) != 2:
+            return None
+        # 将数据库部分作为键，表名部分作为值
+        return {parts[0]: [parts[1]]}
+    except Exception as e:
+        # 捕获任何异常，返回 None
+        print(str(e))
+        return None
 def get_indicator_data_dictionary(indicator_tables):
     try:
         table_str = indicator_tables.strip()
@@ -686,4 +696,4 @@ def dict_intersection(dict1, dict2):
 if __name__ == "__main__":
 
     #dws_connect_test("select subtosign_period/newvisittosub_num as subtosignavgcycle,subtosign_num as subtosignunits from fdc_ads.ads_salesreport_subscranalyse_a_min where statdate = current_date")
-    dws_connect("SELECT projname, roomname, buildname, propertyconsultant, signdate FROM fdc_dwd.dwd_trade_roomsign_a_min WHERE custname = '聂安' AND signdate = '2017-08-31' AND partitiondate=current_date-1;")
+    dws_connect("SELECT * FROM fdc_ads.ads_salesreport_subscranalyse_a_min WHERE statdate >= '2024-10-01' AND statdate <= '2024-10-07'")

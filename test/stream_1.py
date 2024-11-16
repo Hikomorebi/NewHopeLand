@@ -8,8 +8,8 @@ def post_chat(query):
     # 接口地址
     url = "http://me.ilisa.team:45108/chat"
     headers = {"Content-Type": "application/json"}
-    data = {"session_id":"2","query": query,"dataSource":'{"fdc_dws":["dws_proj_room_totalsale_a_min"]}'}
-    # data = {"session_id":"1","query": query,"dataSource":''}
+    #data = {"session_id":"2","query": query,"dataSource":'{"fdc_dws":["dws_proj_room_totalsale_a_min"]}'}
+    data = {"session_id":"2","query": query,"dataSource":''}
     try:
         start_time = time.time()
         response = requests.post(url, headers=headers, data=json.dumps(data))
@@ -33,6 +33,7 @@ def post_chat(query):
                 sql_response = "".join(sql_response)
 
                 print(data)
+                print(answer)
                 print("==========================================================================")
                 match = re.search(r'"chosen_tables":\s*({.*?}),\s*"time":\s*"([^"]+)"', answer, re.DOTALL)
 
@@ -47,7 +48,6 @@ def post_chat(query):
                 print("content:", content)
                 print("sql_code:", sql_code)
                 print("sql_response",json.dumps(json.loads(sql_response[15:-17]), indent=4,ensure_ascii=False))
-                # print("thoughts:", thoughts)
                 end_time = time.time()
                 elapsed_time = end_time - start_time
                 print(f"总耗时: {elapsed_time:.4f} 秒")
@@ -57,4 +57,5 @@ def post_chat(query):
         print("Exception occurred:", str(e))
 
 
-post_chat("查询宁波堇天府在2017年11月的新增签约套数是多少，给出具体值")
+#post_chat("当月新增认购金额是多少？")
+post_chat("国庆期间的总来访数量为多少")

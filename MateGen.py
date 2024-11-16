@@ -107,71 +107,21 @@ class MateGen:
             system_content_list=self.system_content_list, tokens_thr=self.tokens_thr
         )
 
-    def chat(self, question=None):
+    def chat(self, question=None,process_user_input_dict=None):
         # status:0表示大模型调用失败，1表示无需生成SQL语句，2表示生成SQL错误，3表示成功生成SQL语句
         chat_dict = {"time":"\n"}
         if question is not None:
             user_message = {"role": "user", "content": question}
-            # todo:逻辑修改，需要先进行同义词解释，再进行问题干预和指标问数。
-            # 该函数直接判断是否为问题干预（1）、指标问数（2）、同义词解释（3）
-            start_time_chat = time.time()
-            process_user_input_dict = process_user_input(question)
-            end_time_chat = time.time()
-            elapsed_time_chat = end_time_chat - start_time_chat
-            print("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
-            print(f"处理问题耗时: {elapsed_time_chat:.4f} 秒")
-            chat_dict["time"]+=f"处理问题耗时: {elapsed_time_chat:.4f} 秒\n"
-            # 1 表示问题干预成功，直接得到SQL语句
+            self.messages.messages_append(user_message)
+            before_get_sql = time.time()
             if process_user_input_dict["status"] == 1:
                 sql_code = process_user_input_dict["preset_sql"]
                 self.messages.messages_append(user_message)
                 key_fields = None
                 display_type = "response_bar_chart"
             else:
-                indicator_message = copy.deepcopy(self.messages)
-                if process_user_input_dict["status"] == 2:
-                    indicator_data = process_user_input_dict["indicator_data"]
-                    indicator_name = process_user_input_dict["indicator_name"]
-                    print(f"匹配到指标：{indicator_name}")
-                    system_prompt_indicator = system_prompt_indicator_template.format(
-                        indicator_name=indicator_name,
-                        indicator_field_name=indicator_data["指标字段名"],
-                        indicator_rule=indicator_data["计算规则"],
-                    )
-                    indicator_tables = indicator_data["数据来源"]
-                    chat_dict["chosen_tables"] = {"tables":indicator_tables}
-                    indicator_data_dictionary = get_indicator_data_dictionary(
-                        indicator_tables
-                    )
-                    if (
-                        indicator_data_dictionary is None
-                        or indicator_data_dictionary == ""
-                    ):
-                        indicator_message.delete_system_messages_temp()
-                        indicator_message.add_system_message_temp(
-                            {"role": "system", "content": system_prompt_indicator}
-                        )
-                    else:
-                        indicator_system_messages = [
-                            {"role": "system", "content": indicator_data_dictionary},
-                            {"role": "system", "content": system_prompt_indicator},
-                        ]
-                        indicator_message.replace_system_message(
-                            indicator_system_messages
-                        )
-                    indicator_message.messages_append(user_message)
-
-                    self.messages.messages_append(user_message)
-
-                elif process_user_input_dict["status"] == 3:
-                    modified_question = process_user_input_dict["user_question"]
-                    indicator_message.messages_append(
-                        {"role": "user", "content": modified_question}
-                    )
-                    self.messages.messages_append(user_message)
-
                 response_message = get_gpt_response(
-                    client=self.client, model=self.model, messages=indicator_message
+                    client=self.client, model=self.model, messages=self.messages
                 )
                 if type(response_message) is dict:
                     chat_dict["status"] = 0
@@ -194,17 +144,17 @@ class MateGen:
                 if sql_code == "":
                     chat_dict["status"] = 2
                     chat_dict["sql_error_message"] = (
-                        "针对当前问题无法为您生成可用的查询。"
+                        "针对该问题无法为您生成可用的查询。"
                     )
                     self.messages.messages_append(
                         {
                             "role": "assistant",
-                            "content": "针对当前问题无法为您生成可用的查询。",
+                            "content": "针对该问题无法为您生成可用的查询。",
                         }
                     )
                     return chat_dict
             start_time_dws = time.time()
-            elapsed_time_get_sql = start_time_dws - end_time_chat
+            elapsed_time_get_sql = start_time_dws - before_get_sql
             print("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
             print(f"获取SQL语句耗时: {elapsed_time_get_sql:.4f} 秒")
             chat_dict["time"]+=f"获取SQL语句耗时: {elapsed_time_get_sql:.4f} 秒\n"
@@ -216,6 +166,7 @@ class MateGen:
             print("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
             print(f"查询dws数据库并制作sql_response耗时: {elapsed_time_dws:.4f} 秒")
             chat_dict["time"]+=f"查询dws数据库并制作sql_response耗时: {elapsed_time_dws:.4f} 秒\n"
+            
             if sql_exec_dict["status"] == 0:
                 chat_dict["status"] = 2
                 chat_dict["sql_error_message"] = sql_exec_dict["error_message"]
