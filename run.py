@@ -127,7 +127,7 @@ def chat():
             # 捕获其他可能的错误
             print(str(e))
             chosen_tables = None
-
+    
         try:
             available_tables = json.loads(data.get("availableTables"))
         except Exception as e:
@@ -172,10 +172,15 @@ def chat():
         print("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
         print(f"对话准备耗时: {elapsed_time:.4f} 秒")
         chat_dict = mategen.chat(query)
+        chat_dict["time"]=f"\n对话准备耗时: {elapsed_time:.4f} 秒"+chat_dict["time"]
+        if "chosen_tables" not in chat_dict:
+            chat_dict["chosen_tables"] = chosen_tables
+
         after_chat_time = time.time()
         elapsed_time_chat = after_chat_time - before_chat_time
         print("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
         print(f"执行chat函数耗时: {elapsed_time_chat:.4f} 秒")
+        chat_dict["time"]+=f"执行问数函数总耗时（约等于上面三个时间相加）: {elapsed_time_chat:.4f} 秒\n"
 
         def generate_012(chat_dict):
             if chat_dict["status"] == 0:
@@ -215,6 +220,8 @@ def chat():
             finish_info = {
                 "sql_code": chat_dict["sql_code"],
                 "sql_response": chat_dict["sql_results_json"],
+                "chosen_tables":chat_dict["chosen_tables"],
+                "time":chat_dict["time"]
             }
             yield json.dumps(finish_info, default=default_converter)
 
@@ -235,7 +242,11 @@ def chat():
 def analysis():
     try:
         data = request.json
-        saleropenid = data.get("saleropenid")
+        
+        # {"saler_id":"xxx","role_name":"销售主管"}
+        # {"saler_id":"xxx","role_name":"置业顾问"}
+        saleropenid = data.get("saler_id")
+        # 日期用 current_date 作为筛选条件
         start_date = data.get("start_date")
         end_date = data.get("end_date")
 
