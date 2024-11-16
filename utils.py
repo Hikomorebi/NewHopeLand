@@ -10,6 +10,7 @@ from decimal import Decimal, ROUND_HALF_UP
 from openai import OpenAI
 import Levenshtein  # 使用 Levenshtein 库来计算字符串距离
 import time
+import csv
 
 # 设置环境变量（仅在当前脚本运行期间有效）
 os.environ["OPENAI_API_KEY"] = "sk-94987a750c924ae19693c9a9d7ea78f7"
@@ -285,6 +286,27 @@ def get_translate_column_names(column_names):
             translated_column_names.append(column)
     return translated_column_names
 
+# 从CSV文件中读取数据
+def read_csv_data(file_path):
+    with open(file_path, newline='', encoding='utf-8') as csvfile:
+        reader = csv.DictReader(csvfile)
+        return list(reader)
+
+# 查询销售主管涉及的项目ID列表
+def get_project_ids_for_sales_manager(saler_id, role_data):
+    project_ids = []
+    for row in role_data:
+        if row['saler_id'] == saler_id and row['role_name'] == '销售主管':
+            project_ids.append(row['project_id'])
+    return project_ids
+
+# 查询下属置业顾问的saler_id
+def query_subordinates(project_ids, role_data):
+    subordinate_ids = []
+    for row in role_data:
+        if row['role_name'] == '置业顾问' and row['project_id'] in project_ids:
+            subordinate_ids.append(row['saler_id'])
+    return subordinate_ids
 
 # 连接到Navicat(Mysql)数据库
 def connect_to_db():

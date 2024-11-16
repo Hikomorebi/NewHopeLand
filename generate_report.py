@@ -4,7 +4,6 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 import json
 import re
-
 # 设置环境变量（仅在当前脚本运行期间有效）
 os.environ["OPENAI_API_KEY"] = "sk-94987a750c924ae19693c9a9d7ea78f7"
 
@@ -322,7 +321,6 @@ few_shot_examples = '''
 ]
 '''
 
-
 # 调用通义千问 API 生成建议、计划和意向等级
 def generate_model_suggestions_and_rank(customer_data):
     customer_info = "客户基本信息:\n"
@@ -334,17 +332,18 @@ def generate_model_suggestions_and_rank(customer_data):
     根据以下客户的基本信息，生成有针对性的成交卡点、后续跟进计划以及意向等级并以json格式返回：
     {customer_info}
     返回结果应包含以下字段：
-    - "客户基本信息总结": 包含客户基本信息的字典
+    - "置业顾问ID": 客户基本信息中的saleropenid字段
+    - "客户信息": 包含客户姓名和电话的字典
     - "成交卡点分析": 列表，每个元素包含卡点和详细说明
     - "后续跟进计划": 列表，每个元素包含时间、内容、方式
     - "意向等级": 字符串，表示客户的意向等级
-    以严格的课直接处理的JSON字符串格式输出。
-    意向等级包括：
-    A - 认购
-    B - 高意向
-    C - 一般意向
-    D - 低意向
-    E - 无意向
+    以严格的可直接处理的JSON字符串格式输出。
+     意向等级包括：
+        A - 认购
+        B - 高意向
+        C - 一般意向
+        D - 低意向
+        E - 无意向
     - 后续跟进计划最好能直接对应一个或多个成交卡点，同时要针对客户的具体情况，要提出切实可行的行动方案。
     """
 
@@ -353,14 +352,23 @@ def generate_model_suggestions_and_rank(customer_data):
             model=model,
             messages=[{"role": "user", "content": prompt}]
         )
-        print(f"调用 API 成功！")
-        return response.choices[0].message.content
+        # print("API响应内容:", response.choices[0].message.content)  # 打印API响应内容
+        api_response = response.choices[0].message.content
+        # 移除响应内容中的多余字符
+        api_response = api_response.strip().replace('```json', '').replace('```', '')
+        try:
+            # 尝试将API响应解析为JSON
+            response_json = json.loads(api_response)
+            return json.dumps(response_json, ensure_ascii=False)
+        except json.JSONDecodeError as e:
+            print(f"解析API响应为JSON时出错: {e}")
+            return "{}"
     except Exception as e:
-        print(f"调用 API 时出错: {e}")
-        return "未能生成建议。"
-
+        print(f"调用API时出错: {e}")
+        return "{}"
+    
 # 连接数据库查询客户信息
-def query_customer_info(saleropenid, start_date, end_date):
+def query_customer_info(saleropenid):
     connection = psycopg2.connect(dbname="fdc_dc",
                                   user="dws_user_hwai",
                                   password="NewHope#1982@",
@@ -371,36 +379,38 @@ def query_customer_info(saleropenid, start_date, end_date):
 
     try:
         with connection.cursor(cursor_factory=RealDictCursor) as cursor:
-            # 数据库中存在相同客户的多条数据，只返回同一客户的最新记录
+            # ‘当天’数据量太少，扩大时间范围为最近一星期
             sql = """
-                    WITH ranked_customers AS (
-                        SELECT 
-                            username, mobile, channel, live, work, income, house, purpose,
-                            position, floor, area, buyuse, familystructure, dealway,
-                            interestlayout, propcondition, intentprice, liveaddress,
-                            workaddress, interest, memo, usersrc, budget, visitcounts,
-                            userrank, mymttj, unitprice, notbuyreason, customerchannel,
-                            jobs, qq, wechat, memo1, customer_id, customerresource,
-                            ROW_NUMBER() OVER (PARTITION BY username, mobile ORDER BY createtime DESC) as row_num
-                        FROM 
-                            fdc_ods.ods_qw_market_dh_crm_saleruser
-                        WHERE 
-                            saleropenid = %s AND createtime BETWEEN %s AND %s
-                    )
+                WITH ranked_customers AS (
                     SELECT 
-                        username, mobile, channel, live, work, income, house, purpose,
+                        username, saleropenid, mobile, channel, live, work, income, house, purpose,
                         position, floor, area, buyuse, familystructure, dealway,
                         interestlayout, propcondition, intentprice, liveaddress,
                         workaddress, interest, memo, usersrc, budget, visitcounts,
                         userrank, mymttj, unitprice, notbuyreason, customerchannel,
-                        jobs, qq, wechat, memo1, customer_id, customerresource
+                        jobs, qq, wechat, memo1, customer_id, customerresource,
+                        ROW_NUMBER() OVER (PARTITION BY username, mobile ORDER BY createtime DESC) as row_num
                     FROM 
-                        ranked_customers
+                        fdc_ods.ods_qw_market_dh_crm_saleruser
                     WHERE 
-                        row_num = 1
-                    LIMIT 1;                      
+                        saleropenid = %s 
+                        AND createtime >= CURRENT_DATE - INTERVAL '7 days'
+                        AND createtime < CURRENT_DATE + INTERVAL '1 day'
+                )
+                SELECT 
+                    username, saleropenid, mobile, channel, live, work, income, house, purpose,
+                    position, floor, area, buyuse, familystructure, dealway,
+                    interestlayout, propcondition, intentprice, liveaddress,
+                    workaddress, interest, memo, usersrc, budget, visitcounts,
+                    userrank, mymttj, unitprice, notbuyreason, customerchannel,
+                    jobs, qq, wechat, memo1, customer_id, customerresource
+                FROM 
+                    ranked_customers
+                WHERE 
+                    row_num = 1
+                ;
             """
-            cursor.execute(sql, (saleropenid, start_date, end_date))
+            cursor.execute(sql, (saleropenid,))
             result = cursor.fetchall()
             print(f"查询客户信息成功！")
             return result
@@ -410,123 +420,62 @@ def query_customer_info(saleropenid, start_date, end_date):
     finally:
         connection.close()
 
-
-# 生成 markdown 形式报告
-def generate_markdown_report(customers, saleropenid):
-    report = "# 高意向客户分析报告\n"
-    report += f"## 置业顾问ID: {saleropenid}\n\n"
+# 生成 json 形式的报告
+def generate_json_report(customers):
+    report = {
+        "客户分析": []
+    }
 
     for customer in customers:
         suggestions_and_rank = generate_model_suggestions_and_rank(customer)
-        report += suggestions_and_rank + "\n\n"
-    # 只保留以第一个 { 开始，直到最后一个 } 的部分
-    report_json_match = re.search(r"\{[\s\S]*\}", report)
-    if report_json_match:
-        json_report = report_json_match.group()
-    else:
-        json_report = ""
-    filtered_report = filter_report(json_report)
-    return filtered_report
+        print("API返回的JSON数据:", suggestions_and_rank)  # 打印API返回的JSON数据
 
-    md_report = convert_report_to_markdown(filtered_report)
-    '''string_report = json.dumps(md_report, ensure_ascii=False, indent=4)
-    string_report_data = json.loads(string_report)
-    start = report.index('{')
-    end = report.rindex('}') + 1
-    report = report[:start] + json.dumps(string_report_data, ensure_ascii=False, indent=4) + report[end:]'''
-    pre = "# 高意向客户分析报告\n"
-    pre += f"## 置业顾问ID: {saleropenid}\n\n"
-    md_report_pre = pre + md_report
-    return md_report_pre
+        try:
+            # 尝试将API返回的JSON字符串解析为Python字典
+            suggestions_and_rank_data = json.loads(suggestions_and_rank)
+        except json.JSONDecodeError as e:
+            print(f"解析API返回的JSON数据时出错: {e}")
+            continue
 
-def filter_report(report):
-    # 需要保留的客户基本信息的键
-    keys_to_keep = {"来访渠道", "客户姓名", "首复访", "客户情况补充", "最新跟进反馈"}
-    try:
-        json_data = json.loads(report)
-    except json.JSONDecodeError as e:
-        print("JSON Decode Error:", e)
-    
-    # 提取和过滤客户基本信息总结部分，仅保留指定的键
-    customer_info = json_data.get("客户基本信息总结", {})
-    filtered_customer_info = {key: value for key, value in customer_info.items() if key in keys_to_keep}
-    
-    # 检查意向等级是否包含 "A" 或 "B"
-    intent_level = json_data.get("意向等级", "")
-    if "A" in intent_level or "B" in intent_level:
-        # 如果包含 "A" 或 "B"，保留意向等级
-        filtered_intent_level = intent_level
-    else:
-        # 如果不包含，则不保留意向等级
-        filtered_intent_level = None
+        # 确保suggestions_and_rank_data包含所需的字段
+        if "置业顾问ID" in suggestions_and_rank_data and "客户信息" in suggestions_and_rank_data and "意向等级" in suggestions_and_rank_data:
+            saleropenid = suggestions_and_rank_data["置业顾问ID"]
+            customer_info = suggestions_and_rank_data["客户信息"]
+            intent_level = suggestions_and_rank_data["意向等级"]
 
-    # 构建新的过滤后的报告
-    filtered_report = {
-        "客户基本信息总结": filtered_customer_info,
-        "成交卡点分析": json_data.get("成交卡点分析", []),
-        "后续跟进计划": json_data.get("后续跟进计划", [])
-    }
-    
-    # 仅当意向等级包含 "A" 或 "B" 时才添加到过滤后的报告
-    if filtered_intent_level:
-        filtered_report["意向等级"] = filtered_intent_level
+            # 使用正则表达式从意向等级中提取字母部分
+            intent_level_code = re.sub(r'[^A-Z]', '', intent_level)
+            # print(intent_level_code)
 
-    return filtered_report
+            if intent_level_code in ["A", "B"]:
+                customer_report = {
+                    "置业顾问ID": saleropenid,
+                    "客户姓名": customer_info.get('客户姓名', '未知'),
+                    "客户电话": customer_info.get('电话', '未知'),
+                    "意向等级": intent_level,
+                    "意向分析": suggestions_and_rank_data.get("成交卡点分析", []),
+                    "跟进建议": suggestions_and_rank_data.get("后续跟进计划", [])
+                }
 
-def convert_report_to_markdown(json_report):
-    data = json_report
-    # 客户基本信息总结
-    if "客户基本信息总结" in data:
-        markdown = "### 客户基本信息总结\n"
-        customer_info = data["客户基本信息总结"]
-        markdown += f"- **来访渠道**: {customer_info.get('来访渠道', '未知')}\n"
-        markdown += f"- **客户姓名**: {customer_info.get('客户姓名', '未知')}\n"
-        markdown += f"- **首复访**: {customer_info.get('首复访', '未知')}\n"
-        markdown += f"- **客户情况补充**: {customer_info.get('客户情况补充', '未知')}\n"
-        markdown += f"- **最新跟进反馈**: {customer_info.get('最新跟进反馈', '未知')}\n\n"
+                report["客户分析"].append(customer_report)
 
-    # 成交卡点分析
-    if "成交卡点分析" in data:
-        markdown += "### 成交卡点分析\n"
-        for idx, card in enumerate(data["成交卡点分析"], 1):
-            markdown += f"{idx}. **{card.get('卡点', '未知')}**: {card.get('详细说明', '未知')}\n"
-        markdown += "\n"
-
-    # 后续跟进计划
-    if "后续跟进计划" in data:
-        markdown += "### 后续跟进计划\n"
-        for plan in data["后续跟进计划"]:
-            markdown += f"- **时间**: {plan.get('时间', '未知')}\n"
-            markdown += f"  - **内容**: {plan.get('内容', '未知')}\n"
-            markdown += f"  - **方式**: {plan.get('方式', '未知')}\n\n"
-
-    # 意向等级
-    if "意向等级" in data:
-        markdown += "### 意向等级\n"
-        markdown += f"- **{data.get('意向等级', '未知')}**\n"
-
-    return markdown
+    return report
 
 def main():
-    saleropenid = input("请输入置业顾问ID: ")
-    start_date = input("请输入起始日期 (格式: YYYY-MM-DD): ")
-    end_date = input("请输入结束日期 (格式: YYYY-MM-DD): ")
-
-    customers = query_customer_info(saleropenid, start_date, end_date)
+    saleropenid = input("请输入销售人员ID: ")
+    customers = query_customer_info(saleropenid)
     if not customers:
         print("未查询到相关客户信息。")
         return
 
-    report = generate_markdown_report(customers, saleropenid)
+    json_report = generate_json_report(customers)
 
-    return report
-
-    report_filename = f"高意向客户分析报告_{saleropenid}.md"
+    report_filename = f"高意向客户分析报告_{saleropenid}.json"
     with open(report_filename, "w", encoding="utf-8") as file:
-        file.write(report)
+        # 美化输出JSON
+        json.dump(json_report, file, ensure_ascii=False, indent=4)
 
-    print(f"报告已生成并保存到 {report_filename}")
-
+    print(f"报告已生成并保存在 {report_filename}")
 
 if __name__ == "__main__":
     main()
