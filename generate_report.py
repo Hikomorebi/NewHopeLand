@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import os
 from openai import OpenAI
 import psycopg2
@@ -384,7 +385,6 @@ def query_customer_info(saleropenid):
 
     try:
         with connection.cursor(cursor_factory=RealDictCursor) as cursor:
-            # ‘当天’数据量太少，扩大时间范围为最近一星期
             sql = """
                 WITH ranked_customers AS (
                     SELECT 
@@ -398,10 +398,7 @@ def query_customer_info(saleropenid):
                     FROM 
                         fdc_ods.ods_qw_market_dh_crm_saleruser
                     WHERE 
-                        saleropenid = %s 
-                        AND createtime >= CURRENT_DATE - INTERVAL '7 days'
-                        AND createtime < CURRENT_DATE + INTERVAL '1 day'
-                        AND partitiondate >= CURRENT_DATE 
+                        saleropenid = %s AND createtime >= CURRENT_DATE AND createtime < CURRENT_DATE + INTERVAL '1 day'AND partitiondate >= CURRENT_DATE 
                         AND partitiondate < CURRENT_DATE + INTERVAL '1 day'
                 )
                 SELECT 
@@ -414,8 +411,7 @@ def query_customer_info(saleropenid):
                 FROM 
                     ranked_customers
                 WHERE 
-                    row_num = 1
-                LIMIT 3;
+                    row_num = 1;
             """
             cursor.execute(sql, (saleropenid,))
             result = cursor.fetchall()
@@ -427,9 +423,63 @@ def query_customer_info(saleropenid):
     finally:
         connection.close()
 
+# 连接数据库查询来访人数信息
+def query_visitornum_info():
+    connection = psycopg2.connect(dbname="fdc_dc",
+                                  user="dws_user_hwai",
+                                  password="NewHope#1982@",
+                                  host="124.70.57.67",
+                                  client_encoding='UTF8',
+                                  port="8000")
+    print("连接成功！")
+
+    try:
+        with connection.cursor(cursor_factory=RealDictCursor) as cursor:
+            sql = """
+                SELECT 
+                visitornum,
+                newvisitornum,
+                revisitornum
+            FROM 
+                fdc_ads.ads_salesreport_visitweekanalyse_a_min
+            WHERE 
+                statdate = current_date
+                AND orgcode = 'FCSYGS001' --先写死 项目代号，目前缺乏实现流程的逻辑
+            ORDER BY 
+                statdate DESC -- 通常statdate是日期类型,所以按降序排列最新的会在最前面
+            LIMIT 1; -- 限制结果集只返回一条记录
+            """
+            cursor.execute(sql)
+            result = cursor.fetchall()
+            print(f"查询来访人数信息成功！")
+            return result
+    except Exception as e:
+        print(f"查询来访人数信息时出错: {e}")
+        return []
+    finally:
+        connection.close()
+
 # 生成 json 形式的报告
 def generate_json_report(customers):
+    # 尝试获取来访信息，如果失败则使用默认值
+    try:
+        result = query_visitornum_info()
+        if not result:
+            visit_info = {"visitornum": "未知", "newvisitornum": "未知", "revisitornum": "未知"}
+        else:
+            visit_info = result[0]
+    except Exception as e:
+        print(f"查询来访人数信息时发生错误: {e}")
+        visit_info = {"visitornum": "未知", "newvisitornum": "未知", "revisitornum": "未知"}
+ 
+    visitornum = visit_info.get('visitornum', '未知')
+    newvisitornum = visit_info.get('newvisitornum', '未知')
+    revisitornum = visit_info.get('revisitornum', '未知')
+    
     report = {
+        "来访客户": visitornum,
+        "新增来访": newvisitornum,
+        "复访客户": revisitornum,
         "客户分析": []
     }
 
@@ -473,21 +523,21 @@ def generate_json_report(customers):
 
     return report
 
-def main():
-    saleropenid = input("请输入销售人员ID: ")
-    customers = query_customer_info(saleropenid)
-    if not customers:
-        print("未查询到相关客户信息。")
-        return
+# def main():
+#     saleropenid = input("请输入销售人员ID: ")
+#     customers = query_customer_info(saleropenid)
+#     if not customers:
+#         print("未查询到相关客户信息。")
+#         return
 
-    json_report = generate_json_report(customers)
+#     json_report = generate_json_report(customers)
 
-    report_filename = f"高意向客户分析报告_{saleropenid}.json"
-    with open(report_filename, "w", encoding="utf-8") as file:
-        # 美化输出JSON
-        json.dump(json_report, file, ensure_ascii=False, indent=4)
+#     report_filename = f"高意向客户分析报告_{saleropenid}.json"
+#     with open(report_filename, "w", encoding="utf-8") as file:
+#         # 美化输出JSON
+#         json.dump(json_report, file, ensure_ascii=False, indent=4)
 
-    print(f"报告已生成并保存在 {report_filename}")
+#     print(f"报告已生成并保存在 {report_filename}")
 
-if __name__ == "__main__":
-    main()
+# if __name__ == "__main__":
+#     main()

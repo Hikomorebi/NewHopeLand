@@ -178,23 +178,70 @@ def data_to_natural_language(data):
         descriptions.append(description)
     return descriptions
 
-# 将自然语言描述转换为向量
+# 将自然语言描述转换为向量（支持长文本分段处理）
 def convert_to_embeddings(descriptions):
-    encoded_inputs = tokenizer(descriptions, padding=True, truncation=True, return_tensors='pt')
-    with torch.no_grad():
-        model_outputs = model(**encoded_inputs)
-    sentence_embeddings = mean_pooling(model_outputs, encoded_inputs['attention_mask'])
-    return sentence_embeddings
-
+    embeddings_list = []
+    for description in descriptions:
+        # 分割文本为多个段落，每个段落不超过512个token
+        encoded_segments = tokenizer(
+            description,
+            max_length=512,
+            truncation=True,
+            padding=True,
+            return_tensors='pt',
+            return_overflowing_tokens=True,  # 返回溢出的token（如果有的话）
+            is_split_into_words=False  # 根据字符而不是单词分割（对于中文很重要）
+        )
+        
+        # 处理所有段落
+        for segment in encoded_segments.input_ids:
+            attention_mask = (segment != tokenizer.pad_token_id).float().unsqueeze(0)  # 创建attention mask
+            with torch.no_grad():
+                model_output = model(segment.unsqueeze(0), attention_mask=attention_mask)  # 添加batch维度
+            segment_embedding = mean_pooling(model_output, attention_mask)
+            embeddings_list.append(segment_embedding)
+        
+        # 如果文本被分割成了多个段落，我们需要合并这些段落的嵌入
+        # 这里我们简单地使用平均池化来合并
+        if len(encoded_segments.input_ids) > 1:
+            final_embedding = torch.mean(torch.stack(embeddings_list[-len(encoded_segments.input_ids):]), dim=0)
+            embeddings_list[-len(encoded_segments.input_ids):] = [final_embedding]  # 用合并后的嵌入替换段落嵌入
+            embeddings_list = embeddings_list[:-len(encoded_segments.input_ids) + 1]  # 移除旧的段落嵌入
+    
+    # 返回所有描述的嵌入列表（或根据需要进一步处理）
+    return torch.stack(embeddings_list)
+ 
 # 对新数据进行向量化并匹配
 def find_similar_customers(new_description, embeddings, historical_data):
-    encoded_input = tokenizer(new_description, return_tensors='pt')
-    with torch.no_grad():
-        model_output = model(**encoded_input)
-    new_embedding = mean_pooling(model_output, encoded_input['attention_mask'])
+    # 分割并处理新描述（与convert_to_embeddings中的处理相同）
+    encoded_segments = tokenizer(
+        new_description,
+        max_length=512,
+        truncation=True,
+        padding=True,
+        return_tensors='pt',
+        return_overflowing_tokens=True,
+        is_split_into_words=False
+    )
+    new_embedding_list = []
+    for segment in encoded_segments.input_ids:
+        attention_mask = (segment != tokenizer.pad_token_id).float().unsqueeze(0)
+        with torch.no_grad():
+            model_output = model(segment.unsqueeze(0), attention_mask=attention_mask)
+        segment_embedding = mean_pooling(model_output, attention_mask)
+        new_embedding_list.append(segment_embedding)
+    
+    # 合并新描述的段落嵌入（同样使用平均池化）
+    if len(new_embedding_list) > 1:
+        new_embedding = torch.mean(torch.stack(new_embedding_list), dim=0)
+    else:
+        new_embedding = new_embedding_list[0]
+    
+    # 计算相似度并找到最相似的历史客户
     similarities = torch.cosine_similarity(new_embedding, embeddings)
     most_similar_index = torch.argmax(similarities).item()
     return historical_data[most_similar_index]
+
 
 # 查询历史客户信息
 historical_data = query_history_customer_info()
