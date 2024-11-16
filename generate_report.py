@@ -4,6 +4,11 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 import json
 import re
+from info import(
+    historical_data,
+    knowledge_base,
+    find_similar_customers
+)
 # 设置环境变量（仅在当前脚本运行期间有效）
 os.environ["OPENAI_API_KEY"] = "sk-94987a750c924ae19693c9a9d7ea78f7"
 
@@ -396,6 +401,8 @@ def query_customer_info(saleropenid):
                         saleropenid = %s 
                         AND createtime >= CURRENT_DATE - INTERVAL '7 days'
                         AND createtime < CURRENT_DATE + INTERVAL '1 day'
+                        AND partitiondate >= CURRENT_DATE 
+                        AND partitiondate < CURRENT_DATE + INTERVAL '1 day'
                 )
                 SELECT 
                     username, saleropenid, mobile, channel, live, work, income, house, purpose,
@@ -408,7 +415,7 @@ def query_customer_info(saleropenid):
                     ranked_customers
                 WHERE 
                     row_num = 1
-                ;
+                LIMIT 3;
             """
             cursor.execute(sql, (saleropenid,))
             result = cursor.fetchall()
@@ -447,14 +454,19 @@ def generate_json_report(customers):
             intent_level_code = re.sub(r'[^A-Z]', '', intent_level)
             # print(intent_level_code)
 
-            if intent_level_code in ["A", "B"]:
+            if intent_level_code in ["A", "B","C","D","E"]:
+
+                new_customer_description = f"购房用途：{customer['buyuse']}，意向面积：{customer['area']}，家庭构成：{customer['familystructure']}，预算：{customer['budget']}，购房关注点：{customer['interest']}，客户简介：{customer['memo']}，用户评级：{customer['userrank']}。"
+                similar_customer = find_similar_customers(new_customer_description, knowledge_base, historical_data)
+
                 customer_report = {
                     "置业顾问ID": saleropenid,
                     "客户姓名": customer_info.get('客户姓名', '未知'),
                     "客户电话": customer_info.get('电话', '未知'),
                     "意向等级": intent_level,
                     "意向分析": suggestions_and_rank_data.get("成交卡点分析", []),
-                    "跟进建议": suggestions_and_rank_data.get("后续跟进计划", [])
+                    "跟进建议": suggestions_and_rank_data.get("后续跟进计划", []),
+                    "历史相似客户": similar_customer
                 }
 
                 report["客户分析"].append(customer_report)

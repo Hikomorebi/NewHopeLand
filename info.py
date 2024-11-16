@@ -2,7 +2,7 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 from transformers import AutoTokenizer, AutoModel
 import torch
-import numpy as np
+
 
 # 定义均值池化函数
 def mean_pooling(model_output, attention_mask):
@@ -15,14 +15,14 @@ tokenizer = AutoTokenizer.from_pretrained('./models/paraphrase-MiniLM-L6-v2')
 model = AutoModel.from_pretrained('./models/paraphrase-MiniLM-L6-v2')
 
 # 连接数据库查询历史相似客户信息
-def query_customer_info():
+def query_history_customer_info():
     connection = psycopg2.connect(dbname="fdc_dc",
                                   user="dws_user_hwai",
                                   password="NewHope#1982@",
                                   host="124.70.57.67",
                                   client_encoding='UTF8',
                                   port="8000")
-    print("连接成功！")
+    print("连接DWS数据库成功！")
 
     try:
         with connection.cursor(cursor_factory=RealDictCursor) as cursor:
@@ -109,6 +109,8 @@ def query_customer_info():
                     ) AS non_null_column_count
                 FROM 
                     fdc_ods.ods_qw_market_dh_crm_saleruser
+                WHERE partitiondate >= CURRENT_DATE 
+                AND partitiondate < CURRENT_DATE + INTERVAL '1 day'
             ),
             filtered_customers AS (
                 SELECT *
@@ -160,10 +162,10 @@ def query_customer_info():
             """
             cursor.execute(sql)
             result = cursor.fetchall()
-            print(f"查询客户信息成功！")
+            print(f"查询历史相似客户信息成功！")
             return result
     except Exception as e:
-        print(f"查询客户信息时出错: {e}")
+        print(f"查询历史相似客户信息时出错: {e}")
         return []
     finally:
         connection.close()
@@ -195,19 +197,10 @@ def find_similar_customers(new_description, embeddings, historical_data):
     return historical_data[most_similar_index]
 
 # 查询历史客户信息
-historical_data = query_customer_info()
+historical_data = query_history_customer_info()
 
 # 转换历史数据为自然语言描述
 historical_descriptions = data_to_natural_language(historical_data)
 
 # 将自然语言描述转换为向量
 knowledge_base = convert_to_embeddings(historical_descriptions)
-
-# 新的客户信息转为自然语言描述
-new_customer_description = "购房用途：投资，意向面积：120平米，家庭构成：三口之家，预算：200万，购房关注点：学区房，客户简介：无，用户评级：A。"
-
-# 查找与新客户信息最相似的历史客户
-similar_customer = find_similar_customers(new_customer_description, knowledge_base, historical_data)
-
-# 输出匹配结果
-print("最相似的历史客户信息：", similar_customer)
