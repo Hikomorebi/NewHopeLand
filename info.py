@@ -11,8 +11,8 @@ def mean_pooling(model_output, attention_mask):
     return torch.sum(token_embeddings * input_mask_expanded, 1) / torch.clamp(input_mask_expanded.sum(1), min=1e-9)
 
 # 加载模型和分词器
-tokenizer = AutoTokenizer.from_pretrained('sentence-transformers/paraphrase-MiniLM-L6-v2')
-model = AutoModel.from_pretrained('sentence-transformers/paraphrase-MiniLM-L6-v2')
+tokenizer = AutoTokenizer.from_pretrained('./models/paraphrase-MiniLM-L6-v2')
+model = AutoModel.from_pretrained('./models/paraphrase-MiniLM-L6-v2')
 
 # 连接数据库查询历史相似客户信息
 def query_customer_info():

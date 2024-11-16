@@ -1,8 +1,15 @@
-from auto_select_tables import select_table_based_on_query
+from transformers import AutoTokenizer, AutoModel
 
+# 模型名称
+model_name = 'sentence-transformers/paraphrase-MiniLM-L6-v2'
 
-# 示例查询
-query = "查询广佛锦官半岛在2022年的首访人数是多少，给出具体值"
-selected_table = select_table_based_on_query(query)
+# 下载模型和分词器到本地路径
+tokenizer = AutoTokenizer.from_pretrained(model_name)
+model = AutoModel.from_pretrained(model_name)
 
-print(selected_table)
+# 保存模型到本地路径
+local_path = './models/sentence-transformers/paraphrase-MiniLM-L6-v2'
+tokenizer.save_pretrained(local_path)
+model.save_pretrained(local_path)
+
+print("模型和分词器下载并保存成功！")
