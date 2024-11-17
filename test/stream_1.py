@@ -59,5 +59,4 @@ def post_chat(query):
         print("Exception occurred:", str(e))
 
 
-#post_chat("当月新增认购金额是多少？")
-post_chat("查询签约完成率")
+post_chat("当月新增认购金额是多少？")
