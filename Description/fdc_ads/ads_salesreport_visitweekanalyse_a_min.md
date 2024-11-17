@@ -3,7 +3,7 @@ ads_salesreport_visitweekanalyse_a_min
 
 - 数据表解释
 
-经营分析来访周度分析
+经营分析来访周度分析。
 
 - 各字段说明
 

@@ -21,9 +21,3 @@ fdc_ads.ads_salesreport_subscranalyse_a_min
 | subtosign_period     | numeric                         | 认购转签约平均周期           |
 | newvisittosub_num    | integer                         | 首访到认购套数               |
 | newvisittosub_period | numeric                         | 首访到认购平均周期           |
-| channel              | character varying               | 通路                         |
-| cycletype            | character varying               | 周期类型 W-周 M-月 Q-季 Y-年 |
-| visitornum           | integer                         | 总来访                       |
-| newvisitornum        | integer                         | 首访                         |
-| revisitornum         | integer                         | 复访                         |
-| newsubscrnum         | integer                         | 新增认购                     |

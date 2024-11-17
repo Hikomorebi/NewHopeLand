@@ -466,7 +466,6 @@ def process_user_input(user_question):
         # 查询华菁数据库获取所有指标名，以列表形式返回
         indicator_names = get_indicator_names(cursor)
 
-        # todo:需要修改，目前实现为精确匹配，第一阶段修改实现精准匹配失败后通过大语言模型实现模糊匹配，第二阶段实现向量匹配。
         indicator_name = match_indicator(user_question,indicator_names)
 
         if indicator_name:
@@ -515,6 +514,9 @@ def dws_connect(sql_query,key_fields=None,display_type="response_bar_chart"):
                 positions = {i for i, word in enumerate(column_names) if word in key_field_words}
 
             results_length = len(results)
+            if results_length > 100:
+                results = results[:100]
+                results_length = 100
             if results_length==0:
                 dws_connect_dict["status"] = 2
                 dws_connect_dict["is_long"] = False
@@ -576,7 +578,8 @@ def dws_connect_test(sql_query):
 
 def extract_json_fields(input_string):
     # Use regex to find potential JSON parts in the input string
-    json_matches = re.findall(r"{.*?}", input_string, re.DOTALL)
+    # json_matches = re.findall(r"{.*?}", input_string, re.DOTALL)
+    json_matches = re.findall(r"\{(?:[^{}]*|\{(?:[^{}]*|\{[^{}]*\})*\})*\}", input_string, re.DOTALL)
     json_matches.reverse()
 
     for json_str in json_matches:
@@ -593,6 +596,7 @@ def extract_json_fields(input_string):
                 display_type = json_data.get("display_type","")
                 return sql, thoughts, key_fields, display_type
         except json.JSONDecodeError:
+            print("json.JSONDecodeError")
             continue  # Skip to the next match if there's a decoding error
 
     return None, None, None, None
@@ -672,7 +676,18 @@ def test_match(user_question):
     cursor.close()
     conn.close()
     return indicator_name
-
+def select_table_based_on_indicator(indicator_tables):
+    try:
+        table_str = indicator_tables.strip()
+        parts = table_str.split(".")
+        if len(parts) != 2:
+            return None
+        # 将数据库部分作为键，表名部分作为值
+        return {parts[0]: [parts[1]]}
+    except Exception as e:
+        # 捕获任何异常，返回 None
+        print(str(e))
+        return None
 def get_indicator_data_dictionary(indicator_tables):
     try:
         table_str = indicator_tables.strip()
@@ -701,5 +716,6 @@ def dict_intersection(dict1, dict2):
     
     return result
 if __name__ == "__main__":
-    dws_connect_test("select subtosign_period/NULLIF(newvisittosub_num,0) as subtosignavgcycle,subtosign_num as subtosignunits from fdc_ads.ads_salesreport_subscranalyse_a_min where statdate = current_date")
+
     #dws_connect_test("select subtosign_period/newvisittosub_num as subtosignavgcycle,subtosign_num as subtosignunits from fdc_ads.ads_salesreport_subscranalyse_a_min where statdate = current_date")
+    dws_connect("SELECT * FROM fdc_ads.ads_salesreport_subscranalyse_a_min WHERE statdate >= '2024-10-01' AND statdate <= '2024-10-07'")

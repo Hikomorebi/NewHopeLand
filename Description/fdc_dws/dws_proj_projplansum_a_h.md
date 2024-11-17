@@ -3,7 +3,7 @@ fdc_dws.dws_proj_projplansum_a_h
 
 - 数据表解释
 
-项目计划汇总表。
+项目计划汇总表。查询该数据表时，请务必使用 partitiondate 筛选分区时期，若无特别说明，使用 partitiondate = current_date进行筛选。
 
 - 各字段说明
 

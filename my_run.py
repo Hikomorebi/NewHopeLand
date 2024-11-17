@@ -17,6 +17,8 @@ from utils import (
     read_csv_data,
     get_project_ids_for_sales_manager,
     query_subordinates,
+    process_user_input,
+    select_table_based_on_indicator
 )
 from auto_select_tables import select_table_based_on_query
 
@@ -51,6 +53,22 @@ system_prompt_common = """
 确保回答是正确的JSON格式，并且可以被Python的json.loads解析。要求只返回一个json对象，不要包含其余内容。
 如下给出示例：
 <few_shots>
+"""
+system_prompt_indicator_template = """
+{indicator_name}是一个需要计算的指标，它的字段名为{indicator_field_name}，计算规则为:
+{indicator_rule};
+你是一名数据库专家，请根据计算规则生成正确的PostgreSQL语句。要求如下：
+1. 请仔细阅读并理解用户的请求。参考数据库字典提供的表结构和各字段信息，根据计算规则生成正确的PostgreSQL语句。
+2. 请完全按照提供的计算规则模板来设计SQL语句，不要修改计算规则的结构，同时如果计算规则中带有'$'符合作为占位符，需要从用户问题中提取相关的时间等信息来填充占位符。请确保所有占位符都被具体的值填充。
+3. 请确保所有字段和条件都使用具体的值。禁止随意假设不存在的信息。请务必确保生成的SQL语句能够直接运行。
+4. 如果数据字典中存在 partitiondate 字段，请在生成SQL语句的筛选条件中加入 partitiondate = current_date 。如果计算规则中存在 partitiondate 字段，则将该字段值筛选条件设为 current_date 。
+5. 如果用户请求的是一段时间内的数据，请确保SQL语句能够正确提取这段时间内的数据。如询问当日的数据，可以使用 current_date 作为筛选条件。
+6. 若用户提问中涉及项目名称，请提取项目名称作为筛选条件。项目名称可能包含城市名，应视为一个完整的字符串，不要拆分。如"成都皇冠湖壹号","温州立体城"才是完整的项目名称。
+请严格按照计算规则的逻辑给出SQL代码，并按照以下JSON格式响应：
+{{
+    "sql": "SQL Query to run",
+}}
+要求只返回最终的json对象，不要包含其余内容。
 """
 
 mategen_dict = {}
@@ -106,6 +124,7 @@ def chat():
         is_new = False
         print("打印data内容：")
         print(data)
+
         print("显示当前所有会话id：")
         for m in mategen_dict.keys():
             print(m)
@@ -114,35 +133,42 @@ def chat():
         query = data.get("query")
         print("\n\n++++++++++++++++++++++++++++++")
         print(f"用户文本提问：{query}")
+
+        # 问题干预：status=1,preset_sql为sql语句
+        # 指标管理：status=2,indicator_name为指标名,indicator_data为指标描述
+        # 基础问数：status=3,user_question为用户问题
+        process_user_input_dict = process_user_input(query)
+
         # 获取当前会话id
         session_id = data.get("session_id")
         if session_id in mategen_dict:
             mategen = mategen_dict[session_id]
         else:
             is_new = True
-
-        try:
-            # 暂时使用从请求的dataSource字段中获取used_tables，后续实现根据session_id查华菁数据库获取used_tables信息
-            chosen_tables = json.loads(data.get("dataSource"))
-            if isinstance(chosen_tables, list):
+            try:
+                # 暂时使用从请求的dataSource字段中获取used_tables，后续实现根据session_id查华菁数据库获取used_tables信息
+                chosen_tables = json.loads(data.get("dataSource"))
+                if isinstance(chosen_tables, list):
+                    chosen_tables = None
+            except Exception as e:
+                # 捕获其他可能的错误
+                print(str(e))
                 chosen_tables = None
-        except Exception as e:
-            # 捕获其他可能的错误
-            print(str(e))
-            chosen_tables = None
-    
-        try:
-            available_tables = json.loads(data.get("availableTables"))
-        except Exception as e:
-            print(str(e))
-            available_tables = all_tables
+        
+            try:
+                available_tables = json.loads(data.get("availableTables"))
+            except Exception as e:
+                print(str(e))
+                available_tables = all_tables
 
-        # 如果请求中会话id发生变化，则说明切换会话或开启新会话，需要重新加载历史会话
-        if is_new:
             current_session_id = session_id
             # 根据session_id获取历史消息，查询华菁数据库nh_chat_history表中CONTENT字段，注意需要去除id的内容。若为空，则说明开启的是新会话，返回NULL
             session_messages = get_session_messages(current_session_id)
             # 根据session_id获取使用到的表，查询华菁数据库nh_chat_history表中DATA_SET_JSON字段获取
+            if process_user_input_dict["status"] == 2:
+                print(f"识别到指标问数，匹配到指标：{process_user_input_dict['indicator_name']}")
+                chosen_tables = select_table_based_on_indicator(process_user_input_dict["indicator_data"]["数据来源"])
+                print(f"选择的表是：{chosen_tables}")
             if chosen_tables is None:
                 chosen_tables = select_table_based_on_query(query)
                 print(f"选择的表是：{chosen_tables}")
@@ -150,16 +176,34 @@ def chat():
 
             # 根据used_tables拼接获得数据字典
             data_dictionary_md = query_tables_description(used_tables)
-            few_shots = query_few_shots(used_tables)
 
-            mategen = MateGen(
-                api_key=os.getenv("OPENAI_API_KEY"),
-                base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
-                model="qwen-plus",
-                system_content_list=[
-                    system_prompt_common.replace("<few_shots>", few_shots)
-                ],
-            )
+            if process_user_input_dict["status"] == 2:
+                indicator_data = process_user_input_dict["indicator_data"]
+                indicator_name = process_user_input_dict["indicator_name"]
+                system_prompt_indicator = system_prompt_indicator_template.format(
+                indicator_name=indicator_name,
+                indicator_field_name=indicator_data["指标字段名"],
+                indicator_rule=indicator_data["计算规则"],
+                )
+                mategen = MateGen(
+                    api_key=os.getenv("OPENAI_API_KEY"),
+                    base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+                    model="qwen-plus",
+                    system_content_list=[
+                        system_prompt_indicator
+                    ],
+                )
+            else:
+                few_shots = query_few_shots(used_tables)
+
+                mategen = MateGen(
+                    api_key=os.getenv("OPENAI_API_KEY"),
+                    base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+                    model="qwen-plus",
+                    system_content_list=[
+                        system_prompt_common.replace("<few_shots>", few_shots)
+                    ],
+                )
             mategen_dict[session_id] = mategen
 
             # 更换messages对象对应的数据字典部分
@@ -174,10 +218,16 @@ def chat():
 
         print("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
         print(f"对话准备耗时: {elapsed_time:.4f} 秒")
-        chat_dict = mategen.chat(query)
-        chat_dict["time"]=f"\n对话准备耗时: {elapsed_time:.4f} 秒"+chat_dict["time"]
+
+
+        chat_dict = mategen.chat(query,process_user_input_dict)
+
+        chat_dict["time"]=f"\n对话准备耗时: {elapsed_time:.4f} 秒" + chat_dict["time"]
         if "chosen_tables" not in chat_dict:
-            chat_dict["chosen_tables"] = chosen_tables
+            if is_new:
+                chat_dict["chosen_tables"] = chosen_tables
+            else:
+                chat_dict["chosen_tables"] = {"error":"多轮对话不展示chosen_tables信息"}
 
         after_chat_time = time.time()
         elapsed_time_chat = after_chat_time - before_chat_time
