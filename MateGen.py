@@ -156,16 +156,16 @@ class MateGen:
             start_time_dws = time.time()
             elapsed_time_get_sql = start_time_dws - before_get_sql
             print("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
-            print(f"获取SQL语句耗时: {elapsed_time_get_sql:.4f} 秒")
-            chat_dict["time"]+=f"获取SQL语句耗时: {elapsed_time_get_sql:.4f} 秒\n"
+            print(f"第二阶段：获取SQL语句耗时: {elapsed_time_get_sql:.4f} 秒")
+            chat_dict["time"]+=f"第二阶段：获取SQL语句耗时: {elapsed_time_get_sql:.4f} 秒\n"
             # 执行SQL语句
             # status : 0表示sql执行报错,1表示正常返回结果，2表示查询结果为空
             sql_exec_dict = dws_connect(sql_code, key_fields, display_type)
             end_time_dws = time.time()
             elapsed_time_dws = end_time_dws - start_time_dws
             print("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
-            print(f"查询dws数据库并制作sql_response耗时: {elapsed_time_dws:.4f} 秒")
-            chat_dict["time"]+=f"查询dws数据库并制作sql_response耗时: {elapsed_time_dws:.4f} 秒\n"
+            print(f"第三阶段：查询dws数据库并制作sql_response耗时: {elapsed_time_dws:.4f} 秒")
+            chat_dict["time"]+=f"第三阶段：查询dws数据库并制作sql_response耗时: {elapsed_time_dws:.4f} 秒\n"
             
             if sql_exec_dict["status"] == 0:
                 chat_dict["status"] = 2

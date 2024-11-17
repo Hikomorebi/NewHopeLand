@@ -14,6 +14,9 @@ def post_chat(query):
         start_time = time.time()
         response = requests.post(url, headers=headers, data=json.dumps(data))
         if response.status_code == 200:
+            end_time = time.time()
+            elapsed_time = end_time - start_time
+            print(f"发出请求到获取回答总用时: {elapsed_time:.4f} 秒")
             response.encoding = "utf-8"  # 设置编码以正确显示中文字符
             try:
                 response_json = response.json()
@@ -48,9 +51,8 @@ def post_chat(query):
                 print("content:", content)
                 print("sql_code:", sql_code)
                 print("sql_response",json.dumps(json.loads(sql_response[15:-17]), indent=4,ensure_ascii=False))
-                end_time = time.time()
-                elapsed_time = end_time - start_time
-                print(f"总耗时: {elapsed_time:.4f} 秒")
+
+                
         else:
             print(f"Error: {response.status_code}, {response.text}")
     except Exception as e:
@@ -58,4 +60,4 @@ def post_chat(query):
 
 
 #post_chat("当月新增认购金额是多少？")
-post_chat("国庆期间的总来访数量为多少")
+post_chat("查询签约完成率")

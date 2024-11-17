@@ -6,7 +6,7 @@ import time
 import traceback
 from MateGen import MateGen
 import json
-from generate_report import generate_json_report, query_customer_info
+# from generate_report import generate_json_report, query_customer_info
 from utils import (
     default_converter,
     query_tables_description,
@@ -14,11 +14,11 @@ from utils import (
     get_session_messages,
     test_match,
     dict_intersection,
-    read_csv_data,
-    get_project_ids_for_sales_manager,
-    query_subordinates,
+    #read_csv_data,
+    #get_project_ids_for_sales_manager,
+    #query_subordinates,
     process_user_input,
-    select_table_based_on_indicator
+    select_table_based_on_indicator,
 )
 from auto_select_tables import select_table_based_on_query
 
@@ -71,6 +71,99 @@ system_prompt_indicator_template = """
 要求只返回最终的json对象，不要包含其余内容。
 """
 
+system_prompt_subsignrate = """
+认签比是一个需要计算的指标，默认按月份进行计算，其计算规则是
+select 
+    p.projcode,
+    p.projname,
+    p.${month}PlanSignAmount as ${month_zh}月任务, -- 动态月份任务
+    sum(t.taxAmount) as 新增认购金额,
+    case 
+        when p.${month}PlanSignAmount > 0 then sum(t.taxAmount) / p.${month}PlanSignAmount
+        else null
+    end as ${month_zh}月认签比 -- 动态月份认签比
+from 
+    fdc_dws.dws_proj_projplansum_a_h p
+left join 
+    fdc_dwd.dwd_trade_roomsubscr_a_min t
+on
+    p.projcode = t.projcode
+    and t.partitiondate = current_date
+    and t.subscrexecdate between '${startdate}' and '${enddate}'
+    and t.closeDate > '${enddate}'
+where 
+    p.partitiondate = current_date
+    and p.years = '${year}'
+group by 
+    p.projcode, p.projname, p.${month}PlanSignAmount;
+你是一名数据库专家，请根据计算规则生成正确的PostgreSQL语句。要求如下：
+1. 请仔细阅读并理解用户的请求。参考数据库字典提供的表结构和各字段信息，根据计算规则生成正确的PostgreSQL语句。
+2. 请完全按照提供的计算规则模板来设计SQL语句，不要修改计算规则的结构，同时如果计算规则中带有'$'符合作为占位符，需要从用户问题中提取相关的时间等信息来填充占位符。请确保所有占位符都被具体的值填充。
+3. 请确保所有字段和条件都使用具体的值。禁止随意假设不存在的信息。请务必确保生成的SQL语句能够直接运行。
+4. 如果未指定具体月份，请按照当前月份2024年11月份进行计算。
+请严格按照计算规则的逻辑给出SQL代码，并按照以下JSON格式响应：
+{
+    "sql": "SQL Query to run",
+}
+示例：查询2021年2月份的认签比。
+回答：
+{
+    "sql:"select p.projcode, p.projname, p.m2PlanSignAmount as 二月任务, sum(t.taxAmount) as 新增认购金额, case when p.m2PlanSignAmount > 0 then sum(t.taxAmount) / p.m2PlanSignAmount else null end as 二月认签比 from fdc_dws.dws_proj_projplansum_a_h p left join fdc_dwd.dwd_trade_roomsubscr_a_min t on p.projcode = t.projcode and t.partitiondate = current_date and t.subscrexecdate between '2021-01-01' and '2021-12-31' and t.closeDate > '2021-12-31' where p.partitiondate = current_date and p.years = '2021' group by p.projcode, p.projname, p.m2PlanSignAmount;"
+}
+"""
+
+system_prompt_signrate = """
+签约完成率是一个需要计算的指标，默认按月份进行计算，其计算规则是
+select 
+    p.projcode,
+    p.projname,
+    p.${month}PlanSignAmount as ${month_zh}月任务, -- 动态月份任务
+    sum(
+        nvl(t.contrtotalprice, 0) + 
+        nvl(t.firstdecoraterenosum, 0) + 
+        (case when t.fitmentpriceiscontr = '0' then nvl(t.decoratetotalprice, 0) else 0 end)
+    ) as 新增签约金额,
+    case 
+        when p.${month}PlanSignAmount > 0 then 
+            sum(
+                nvl(t.contrtotalprice, 0) + 
+                nvl(t.firstdecoraterenosum, 0) + 
+                (case when t.fitmentpriceiscontr = '0' then nvl(t.decoratetotalprice, 0) else 0 end)
+            ) / p.${month}PlanSignAmount
+        else null
+    end as ${month_zh}月签约完成率
+from 
+    fdc_dws.dws_proj_projplansum_a_h p
+left join 
+    fdc_dwd.dwd_trade_roomsign_a_min t
+on 
+    p.projcode = t.projcode
+where 
+    p.partitiondate = current_date 
+    and t.partitiondate = current_date
+    and t.signexecdate between '${startdate}' and '${enddate}'
+    and t.closedate > '${enddate}'
+    and p.years = '${year}'
+group by 
+    p.projcode, 
+    p.projname, 
+    p.${month}PlanSignAmount;
+你是一名数据库专家，请根据计算规则生成正确的PostgreSQL语句。要求如下：
+1. 请仔细阅读并理解用户的请求。参考数据库字典提供的表结构和各字段信息，根据计算规则生成正确的PostgreSQL语句。
+2. 请完全按照提供的计算规则模板来设计SQL语句，不要修改计算规则的结构，同时如果计算规则中带有'$'符合作为占位符，需要从用户问题中提取相关的时间等信息来填充占位符。请确保所有占位符都被具体的值填充。
+3. 请确保所有字段和条件都使用具体的值。禁止随意假设不存在的信息。请务必确保生成的SQL语句能够直接运行。
+4. 如果未指定具体月份，请按照当前月份2024年11月份进行计算。
+请严格按照计算规则的逻辑给出SQL代码，并按照以下JSON格式响应：
+{
+    "sql": "SQL Query to run",
+}
+示例：查询2024年1月份所有项目的签约完成率。
+回答：
+{
+    "sql:"select p.projcode, p.projname, p.m1PlanSignAmount as 一月任务, sum(nvl(t.contrtotalprice, 0) + nvl(t.firstdecoraterenosum, 0) + (case when t.fitmentpriceiscontr = '0' then nvl(t.decoratetotalprice, 0) else 0 end)) as 新增签约金额, case when p.m1PlanSignAmount > 0 then sum(nvl(t.contrtotalprice, 0) + nvl(t.firstdecoraterenosum, 0) + (case when t.fitmentpriceiscontr = '0' then nvl(t.decoratetotalprice, 0) else 0 end)) / p.m1PlanSignAmount else null end as 一月签约完成率 from fdc_dws.dws_proj_projplansum_a_h p left join fdc_dwd.dwd_trade_roomsign_a_min t on p.projcode = t.projcode where p.partitiondate = current_date and t.partitiondate = current_date and t.signexecdate between '2024-01-01' and '2024-01-31' and t.closedate > '2024-01-31' and p.years = '2024' group by p.projcode, p.projname, p.m1PlanSignAmount;"
+}
+
+"""
 mategen_dict = {}
 all_tables = {
     "fdc_ads": [
@@ -154,7 +247,7 @@ def chat():
                 # 捕获其他可能的错误
                 print(str(e))
                 chosen_tables = None
-        
+
             try:
                 available_tables = json.loads(data.get("availableTables"))
             except Exception as e:
@@ -166,8 +259,17 @@ def chat():
             session_messages = get_session_messages(current_session_id)
             # 根据session_id获取使用到的表，查询华菁数据库nh_chat_history表中DATA_SET_JSON字段获取
             if process_user_input_dict["status"] == 2:
-                print(f"识别到指标问数，匹配到指标：{process_user_input_dict['indicator_name']}")
-                chosen_tables = select_table_based_on_indicator(process_user_input_dict["indicator_data"]["数据来源"])
+                print(
+                    f"识别到指标问数，匹配到指标：{process_user_input_dict['indicator_name']}"
+                )
+                if process_user_input_dict["indicator_name"] == "认签比":
+                    chosen_tables = {"fdc_dwd":["dwd_trade_roomsubscr_a_min"],"fdc_dws":["dws_proj_projplansum_a_h"]}
+                elif process_user_input_dict["indicator_name"] == "签约完成率":
+                    chosen_tables = {"fdc_dwd":["dwd_trade_roomsubscr_a_min"],"fdc_dws":["dws_proj_projplansum_a_h"]}
+                else:
+                    chosen_tables = select_table_based_on_indicator(
+                        process_user_input_dict["indicator_data"]["数据来源"]
+                    )
                 print(f"选择的表是：{chosen_tables}")
             if chosen_tables is None:
                 chosen_tables = select_table_based_on_query(query)
@@ -180,19 +282,33 @@ def chat():
             if process_user_input_dict["status"] == 2:
                 indicator_data = process_user_input_dict["indicator_data"]
                 indicator_name = process_user_input_dict["indicator_name"]
-                system_prompt_indicator = system_prompt_indicator_template.format(
-                indicator_name=indicator_name,
-                indicator_field_name=indicator_data["指标字段名"],
-                indicator_rule=indicator_data["计算规则"],
-                )
-                mategen = MateGen(
-                    api_key=os.getenv("OPENAI_API_KEY"),
-                    base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
-                    model="qwen-plus",
-                    system_content_list=[
-                        system_prompt_indicator
-                    ],
-                )
+
+                if indicator_name == "认签比":
+                    mategen = MateGen(
+                        api_key=os.getenv("OPENAI_API_KEY"),
+                        base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+                        model="qwen-plus",
+                        system_content_list=[system_prompt_subsignrate],
+                    )
+                elif indicator_name == "签约完成率":
+                    mategen = MateGen(
+                        api_key=os.getenv("OPENAI_API_KEY"),
+                        base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+                        model="qwen-plus",
+                        system_content_list=[system_prompt_signrate],
+                    )
+                else:
+                    system_prompt_indicator = system_prompt_indicator_template.format(
+                        indicator_name=indicator_name,
+                        indicator_field_name=indicator_data["指标字段名"],
+                        indicator_rule=indicator_data["计算规则"],
+                    )
+                    mategen = MateGen(
+                        api_key=os.getenv("OPENAI_API_KEY"),
+                        base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+                        model="qwen-plus",
+                        system_content_list=[system_prompt_indicator],
+                    )
             else:
                 few_shots = query_few_shots(used_tables)
 
@@ -217,23 +333,18 @@ def chat():
         elapsed_time = before_chat_time - start_time
 
         print("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
-        print(f"对话准备耗时: {elapsed_time:.4f} 秒")
+        print(f"第一阶段：对话准备（数据表选择）耗时: {elapsed_time:.4f} 秒")
 
+        chat_dict = mategen.chat(query, process_user_input_dict)
 
-        chat_dict = mategen.chat(query,process_user_input_dict)
-
-        chat_dict["time"]=f"\n对话准备耗时: {elapsed_time:.4f} 秒" + chat_dict["time"]
+        chat_dict["time"] = f"\n第一阶段：对话准备（数据表选择）耗时: {elapsed_time:.4f} 秒" + chat_dict["time"]
         if "chosen_tables" not in chat_dict:
             if is_new:
                 chat_dict["chosen_tables"] = chosen_tables
             else:
-                chat_dict["chosen_tables"] = {"error":"多轮对话不展示chosen_tables信息"}
-
-        after_chat_time = time.time()
-        elapsed_time_chat = after_chat_time - before_chat_time
-        print("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
-        print(f"执行chat函数耗时: {elapsed_time_chat:.4f} 秒")
-        chat_dict["time"]+=f"执行问数函数总耗时（约等于上面三个时间相加）: {elapsed_time_chat:.4f} 秒\n"
+                chat_dict["chosen_tables"] = {
+                    "error": "多轮对话不展示chosen_tables信息"
+                }
 
         def generate_012(chat_dict):
             if chat_dict["status"] == 0:
@@ -273,8 +384,8 @@ def chat():
             finish_info = {
                 "sql_code": chat_dict["sql_code"],
                 "sql_response": chat_dict["sql_results_json"],
-                "chosen_tables":chat_dict["chosen_tables"],
-                "time":chat_dict["time"]
+                "chosen_tables": chat_dict["chosen_tables"],
+                "time": chat_dict["time"],
             }
             yield json.dumps(finish_info, default=default_converter)
 
@@ -291,51 +402,54 @@ def chat():
         return jsonify({"status": "error", "response": str(e)})
 
 
-@app.route("/analysis", methods=["POST"])
-def analysis():
-    try:
-        data = request.json
-        saleropenid = data.get("saler_id")
-        role_name = data.get("role_name")
-        if not all([saleropenid, role_name]):
-            return jsonify({
-                "status": "error",
-                "response": "缺少必要的参数: saler_id 或 role_name",
-            })
-        
-        # 读取当天的销售人员信息
-        # 后续可能要改成数据库的读取形式
-        role_data = read_csv_data('role.csv')  
-        
-        # 如果是销售主管，查询所有下属的置业顾问的顾客信息
-        if role_name == "销售主管":
-            project_ids = get_project_ids_for_sales_manager(saleropenid, role_data)
-            subordinate_ids = query_subordinates(project_ids, role_data)
-            customer_data = []
-            for sub_id in subordinate_ids:
-                customers = query_customer_info(sub_id)
-                customer_data.extend(customers)
-        # 如果是置业顾问，只查询自己的顾客信息        
-        else:
-            customer_data = query_customer_info(saleropenid)
+# @app.route("/analysis", methods=["POST"])
+# def analysis():
+#     try:
+#         data = request.json
+#         saleropenid = data.get("saler_id")
+#         role_name = data.get("role_name")
+#         if not all([saleropenid, role_name]):
+#             return jsonify(
+#                 {
+#                     "status": "error",
+#                     "response": "缺少必要的参数: saler_id 或 role_name",
+#                 }
+#             )
 
-        if not customer_data:
-            return jsonify({"status": "error", "response": "未查询到相关客户信息。"})
+#         # 读取当天的销售人员信息
+#         # 后续可能要改成数据库的读取形式
+#         role_data = read_csv_data("role.csv")
 
-        json_report = generate_json_report(customer_data)
+#         # 如果是销售主管，查询所有下属的置业顾问的顾客信息
+#         if role_name == "销售主管":
+#             project_ids = get_project_ids_for_sales_manager(saleropenid, role_data)
+#             subordinate_ids = query_subordinates(project_ids, role_data)
+#             customer_data = []
+#             for sub_id in subordinate_ids:
+#                 customers = query_customer_info(sub_id)
+#                 customer_data.extend(customers)
+#         # 如果是置业顾问，只查询自己的顾客信息
+#         else:
+#             customer_data = query_customer_info(saleropenid)
 
-        report_filename = f"高意向客户分析报告_{saleropenid}.json"
-        with open(report_filename, "w", encoding="utf-8") as file:
-            # 美化输出JSON
-            json.dump(json_report, file, ensure_ascii=False, indent=4)
+#         if not customer_data:
+#             return jsonify({"status": "error", "response": "未查询到相关客户信息。"})
 
-        print(f"报告已生成并保存在 {report_filename}")
+#         json_report = generate_json_report(customer_data)
 
-        return jsonify({"status": "success", "response": json_report})
+#         report_filename = f"高意向客户分析报告_{saleropenid}.json"
+#         with open(report_filename, "w", encoding="utf-8") as file:
+#             # 美化输出JSON
+#             json.dump(json_report, file, ensure_ascii=False, indent=4)
 
-    except Exception as e:
-        traceback.print_exc()
-        return jsonify({"status": "error", "response": str(e)})
+#         print(f"报告已生成并保存在 {report_filename}")
+
+#         return jsonify({"status": "success", "response": json_report})
+
+#     except Exception as e:
+#         traceback.print_exc()
+#         return jsonify({"status": "error", "response": str(e)})
+
 
 if __name__ == "__main__":
     app.run(threaded=True, host="0.0.0.0", port=45108)
