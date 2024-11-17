@@ -398,8 +398,8 @@ def query_customer_info(saleropenid):
                     FROM 
                         fdc_ods.ods_qw_market_dh_crm_saleruser
                     WHERE 
-                        saleropenid = %s AND createtime >= CURRENT_DATE AND createtime < CURRENT_DATE + INTERVAL '1 day'AND partitiondate >= CURRENT_DATE 
-                        AND partitiondate < CURRENT_DATE + INTERVAL '1 day'
+                        saleropenid = %s AND createtime >= CURRENT_DATE - INTERVAL '3 month' AND createtime < CURRENT_DATE + INTERVAL '1 day'
+                        AND partitiondate >= CURRENT_DATE - INTERVAL '3 month' AND partitiondate < CURRENT_DATE + INTERVAL '1 day'
                 )
                 SELECT 
                     username, saleropenid, mobile, channel, live, work, income, house, purpose,
@@ -504,7 +504,7 @@ def generate_json_report(customers):
             intent_level_code = re.sub(r'[^A-Z]', '', intent_level)
             # print(intent_level_code)
 
-            if intent_level_code in ["A", "B","C","D","E"]:
+            if intent_level_code in ["A", "B"]:
 
                 new_customer_description = f"购房用途：{customer['buyuse']}，意向面积：{customer['area']}，家庭构成：{customer['familystructure']}，预算：{customer['budget']}，购房关注点：{customer['interest']}，客户简介：{customer['memo']}，用户评级：{customer['userrank']}。"
                 similar_customer = find_similar_customers(new_customer_description, knowledge_base, historical_data)
