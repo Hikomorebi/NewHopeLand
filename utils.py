@@ -34,7 +34,7 @@ def format_decimal_value(value):
 
     # 对于其他数值，保留两位小数并四舍五入
     # 使用 ROUND_HALF_UP 来确保正确的舍入
-    formatted_value = value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    formatted_value = value.quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
 
     # 如果结果是整数，例如 1689.00，转换为整数形式
     if formatted_value == formatted_value.to_integral_value():
@@ -718,4 +718,4 @@ def dict_intersection(dict1, dict2):
 if __name__ == "__main__":
 
     #dws_connect_test("select subtosign_period/newvisittosub_num as subtosignavgcycle,subtosign_num as subtosignunits from fdc_ads.ads_salesreport_subscranalyse_a_min where statdate = current_date")
-    dws_connect("""select p.projcode, p.projname, p.m11PlanSignAmount as 十一月任务, sum(nvl(t.contrtotalprice, 0) + nvl(t.firstdecoraterenosum, 0) + (case when t.fitmentpriceiscontr = '0' then nvl(t.decoratetotalprice, 0) else 0 end)) as 新增签约金额, case when p.m11PlanSignAmount > 0 then sum(nvl(t.contrtotalprice, 0) + nvl(t.firstdecoraterenosum, 0) + (case when t.fitmentpriceiscontr = '0' then nvl(t.decoratetotalprice, 0) else 0 end)) / p.m11PlanSignAmount else null end as 十一月签约完成率 from fdc_dws.dws_proj_projplansum_a_h p left join fdc_dwd.dwd_trade_roomsign_a_min t on p.projcode = t.projcode where p.partitiondate = current_date and t.partitiondate = current_date and t.signexecdate between '2024-11-01' and '2024-11-30' and t.closedate > '2024-11-30' and p.years = '2024' group by p.projcode, p.projname, p.m11PlanSignAmount;""")
+    dws_connect("""select p.projcode, p.projname, p.m6plansignamount as 六月任务, sum(t.taxAmount) as 新增认购金额, case when p.m6plansignamount > 0 then sum(t.taxAmount) / p.m6plansignamount else null end as 六月认签比 from fdc_dws.dws_proj_projplansum_a_h p left join fdc_dwd.dwd_trade_roomsubscr_a_min t on p.projcode = t.projcode and t.partitiondate = current_date and t.subscrexecdate between '2022-06-01' and '2022-06-30' and t.closeDate > '2022-06-30' where p.partitiondate = current_date and p.years = '2022' and p.projname = '成都锦官天宸' group by p.projcode, p.projname, p.m6plansignamount;""")

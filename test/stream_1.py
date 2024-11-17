@@ -9,7 +9,7 @@ def post_chat(query):
     url = "http://me.ilisa.team:45108/chat"
     headers = {"Content-Type": "application/json"}
     #data = {"session_id":"2","query": query,"dataSource":'{"fdc_dws":["dws_proj_room_totalsale_a_min"]}'}
-    data = {"session_id":"2","query": query,"dataSource":''}
+    data = {"session_id":"3","query": query,"dataSource":''}
     try:
         start_time = time.time()
         response = requests.post(url, headers=headers, data=json.dumps(data))
@@ -59,4 +59,4 @@ def post_chat(query):
         print("Exception occurred:", str(e))
 
 
-post_chat("当月新增认购金额是多少？")
+post_chat("其中温州立体城的是多少？")
