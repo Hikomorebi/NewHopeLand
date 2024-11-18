@@ -182,6 +182,8 @@ def data_to_natural_language(data):
 def convert_to_embeddings(descriptions):
     embeddings_list = []
     for description in descriptions:
+        if not description:  # 检查描述是否为空
+            continue
         # 分割文本为多个段落，每个段落不超过512个token
         encoded_segments = tokenizer(
             description,
@@ -207,6 +209,10 @@ def convert_to_embeddings(descriptions):
             final_embedding = torch.mean(torch.stack(embeddings_list[-len(encoded_segments.input_ids):]), dim=0)
             embeddings_list[-len(encoded_segments.input_ids):] = [final_embedding]  # 用合并后的嵌入替换段落嵌入
             embeddings_list = embeddings_list[:-len(encoded_segments.input_ids) + 1]  # 移除旧的段落嵌入
+    
+    # 确保 embeddings_list 不是空的
+    if not embeddings_list:
+        raise ValueError("embeddings_list is empty, please check the input data.")
     
     # 返回所有描述的嵌入列表（或根据需要进一步处理）
     return torch.stack(embeddings_list)

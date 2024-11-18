@@ -338,8 +338,6 @@ def generate_model_suggestions_and_rank(customer_data):
     根据以下客户的基本信息，生成有针对性的成交卡点、后续跟进计划以及意向等级并以json格式返回：
     {customer_info}
     返回结果应包含以下字段：
-    - "置业顾问ID": 客户基本信息中的saleropenid字段
-    - "客户信息": 包含客户姓名和电话的字典
     - "成交卡点分析": 列表，每个元素包含卡点和详细说明
     - "后续跟进计划": 列表，每个元素包含时间、内容、方式
     - "意向等级": 字符串，表示客户的意向等级
@@ -386,32 +384,32 @@ def query_customer_info(saleropenid):
     try:
         with connection.cursor(cursor_factory=RealDictCursor) as cursor:
             sql = """
-                WITH ranked_customers AS (
-                    SELECT 
-                        username, saleropenid, mobile, channel, live, work, income, house, purpose,
-                        position, floor, area, buyuse, familystructure, dealway,
-                        interestlayout, propcondition, intentprice, liveaddress,
-                        workaddress, interest, memo, usersrc, budget, visitcounts,
-                        userrank, mymttj, unitprice, notbuyreason, customerchannel,
-                        jobs, qq, wechat, memo1, customer_id, customerresource,
-                        ROW_NUMBER() OVER (PARTITION BY username, mobile ORDER BY createtime DESC) as row_num
-                    FROM 
-                        fdc_ods.ods_qw_market_dh_crm_saleruser
-                    WHERE 
-                        saleropenid = %s AND createtime >= CURRENT_DATE - INTERVAL '3 month' AND createtime < CURRENT_DATE + INTERVAL '1 day'
-                        AND partitiondate >= CURRENT_DATE - INTERVAL '3 month' AND partitiondate < CURRENT_DATE + INTERVAL '1 day'
-                )
+            WITH ranked_customers AS (
                 SELECT 
-                    username, saleropenid, mobile, channel, live, work, income, house, purpose,
-                    position, floor, area, buyuse, familystructure, dealway,
-                    interestlayout, propcondition, intentprice, liveaddress,
-                    workaddress, interest, memo, usersrc, budget, visitcounts,
-                    userrank, mymttj, unitprice, notbuyreason, customerchannel,
-                    jobs, qq, wechat, memo1, customer_id, customerresource
+                    u.id, u.createtime, u.username, u.age, u.familystructure, u.mobile, 
+                    u.qualified, u.visitcounts, u.budget, u.customerresource, u.mymttj, u.work, u.live, u.industry, u.jobs,
+                    u.house, u.purpose, u.floor, u.interest, u.notbuyreason, u.userrank, u.memo , u.saleropenid,
+                    u.buyuse, u.dealway, u.channel, u.unitprice, u.customerchannel, u.memo1, u.customer_id, u.income,
+                    u.area,
+                    ROW_NUMBER() OVER (PARTITION BY u.username, u.mobile ORDER BY u.createtime DESC) as row_num
                 FROM 
-                    ranked_customers
+                    fdc_ods.ods_qw_market_dh_crm_saleruser u
                 WHERE 
-                    row_num = 1;
+                    u.saleropenid = %s AND u.createtime >= CURRENT_DATE - INTERVAL '3 month' AND u.createtime < CURRENT_DATE + INTERVAL '1 day'
+                    AND u.partitiondate >= CURRENT_DATE - INTERVAL '3 month' AND u.partitiondate < CURRENT_DATE + INTERVAL '1 day'
+            )
+            SELECT 
+                id, createtime, username, age, familystructure, mobile, 
+                qualified, visitcounts, budget, customerresource, mymttj, work, live, industry, jobs,
+                house, purpose, floor, interest, notbuyreason, userrank, memo , saleropenid,
+                buyuse, dealway, channel, unitprice, customerchannel, memo1, customer_id, income,
+                area,
+                row_num
+            FROM 
+                ranked_customers
+            WHERE 
+                row_num = 1
+                ;
             """
             cursor.execute(sql, (saleropenid,))
             result = cursor.fetchall()
@@ -422,7 +420,6 @@ def query_customer_info(saleropenid):
         return []
     finally:
         connection.close()
-
 # 连接数据库查询来访人数信息
 def query_visitornum_info():
     connection = psycopg2.connect(dbname="fdc_dc",
@@ -495,28 +492,54 @@ def generate_json_report(customers):
             continue
 
         # 确保suggestions_and_rank_data包含所需的字段
-        if "置业顾问ID" in suggestions_and_rank_data and "客户信息" in suggestions_and_rank_data and "意向等级" in suggestions_and_rank_data:
-            saleropenid = suggestions_and_rank_data["置业顾问ID"]
-            customer_info = suggestions_and_rank_data["客户信息"]
+        if  "意向等级" in suggestions_and_rank_data:
+
             intent_level = suggestions_and_rank_data["意向等级"]
 
             # 使用正则表达式从意向等级中提取字母部分
             intent_level_code = re.sub(r'[^A-Z]', '', intent_level)
-            # print(intent_level_code)
 
-            if intent_level_code in ["A", "B"]:
+            if intent_level_code in ["A", "B", "C"]:
 
                 new_customer_description = f"购房用途：{customer['buyuse']}，意向面积：{customer['area']}，家庭构成：{customer['familystructure']}，预算：{customer['budget']}，购房关注点：{customer['interest']}，客户简介：{customer['memo']}，用户评级：{customer['userrank']}。"
                 similar_customer = find_similar_customers(new_customer_description, knowledge_base, historical_data)
 
                 customer_report = {
-                    "置业顾问ID": saleropenid,
-                    "客户姓名": customer_info.get('客户姓名', '未知'),
-                    "客户电话": customer_info.get('电话', '未知'),
+
+                    "置业顾问ID": customer.get('saleropenid', '未知'),
+                    "客户姓名": customer.get('username', '未知'),  
+                    "年龄": customer.get('age', '未知'),  
+                    "家庭结构": customer.get('familystructure', '未知'),
+                    "电话": customer.get('mobile', '未知'),  
+                    "是否具有购房资格": customer.get('qualified', '未知'),
+                    "置业次数": customer.get('visitcounts', '未知'),
+                    # 假设正确的首付预算键名为 'downpayment_budget'
+                    "首付预算": customer.get('downpayment_budget', '待定'),
+                    "总价预算": customer.get('budget', '未知'),  
+                    "客户来源": customer.get('customerresource', '未知'),
+                    "认知途径": customer.get('mymttj', '未知'),
+                    "工作区域": customer.get('work', '未知'),
+                    "居住区域": customer.get('live', '未知'),
+                    "行业": customer.get('industry', '未知'),
+                    "职务": customer.get('jobs', '未知'),
+                    "目前居住的面积": customer.get('house', '未知'),
+                    "需求户型": customer.get('purpose', '未知'),
+                    "意向楼栋": customer.get('floor', '未知'),
+                    # 假设正确的意向房源一键名为 'favorite_house_1'
+                    "意向房源一": customer.get('favorite_house_1', '待定'),
+                    # 假设正确的意向房源二键名为 'favorite_house_2'
+                    "意向房源二": customer.get('favorite_house_2', '待定'),
+                    "客户关注点": customer.get('interest', '未知'),
+                    # 假设正确的客户对项目满意点键名为 'satisfaction_points'
+                    "客户对项目满意点": customer.get('satisfaction_points', '待定'),
+                    "对比项目": similar_customer,
+                    "未成交抗性": suggestions_and_rank_data.get("成交卡点分析", []),
+                    # 假设正确的未成交原因分类键名为 'non_deal_reason'
+                    "未成交原因分类": customer.get('non_deal_reason', '待定'),
+                    "意向度": customer.get('userrank', '未知'),
                     "意向等级": intent_level,
-                    "意向分析": suggestions_and_rank_data.get("成交卡点分析", []),
-                    "跟进建议": suggestions_and_rank_data.get("后续跟进计划", []),
-                    "历史相似客户": similar_customer
+                    "客户白描": customer.get('memo', '未知'),  
+                    "跟进建议": suggestions_and_rank_data.get("后续跟进计划", [])
                 }
 
                 report["客户分析"].append(customer_report)
