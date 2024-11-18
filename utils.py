@@ -456,10 +456,25 @@ def process_user_input(user_question):
         # 如果找到干预问题，返回预设的SQL语句
         print(f"Intervention found: {preset_sql}")
         # 关闭数据库连接
-        cursor.close()
-        conn.close()
+
         process_user_input_dict["status"] = 1
         process_user_input_dict["preset_sql"] = preset_sql
+        process_user_input_dict["is_indicator"] = False
+
+        indicator_names = get_indicator_names(cursor)
+
+        indicator_name = match_indicator(user_question,indicator_names)
+
+        if indicator_name:
+            # 如果找到匹配的指标，返回匹配的指标
+            # 关闭数据库连接
+            indicator_data = get_indicator_data(cursor,indicator_name)
+            process_user_input_dict["is_indicator"] = True
+            process_user_input_dict["indicator_name"] = indicator_name
+            process_user_input_dict["indicator_data"] = indicator_data
+            
+        cursor.close()
+        conn.close()
         return process_user_input_dict
     else:
         # 如果没有找到干预问题，进行指标匹配
@@ -719,23 +734,4 @@ def dict_intersection(dict1, dict2):
 if __name__ == "__main__":
 
     #dws_connect_test("select subtosign_period/newvisittosub_num as subtosignavgcycle,subtosign_num as subtosignunits from fdc_ads.ads_salesreport_subscranalyse_a_min where statdate = current_date")
-    dws_connect("""select a.cityname as 公司
-,a.subscramount/nullif(b.plansignamount, 0) as 认签比
-,a.subscramount as 月度新增认购金额
-,b.plansignamount as 月度签约任务
-,nvl(a.subscramount/nullif(b.plansignamount, 0), 0) - EXTRACT(DAY FROM CURRENT_DATE)::FLOAT / EXTRACT(DAY FROM last_day(current_date)) 认签比达成进度
-from 
-(
-    select citycode, cityname, sum(subscramount) as subscramount
-    from fdc_dwd.dwd_trade_roomsubscr_a_min 
-    where partitiondate = current_date 
-    and subscrexecdate between date_trunc('month', current_date) and current_date and (subscrstatus = '激活' or closereason = '转签约')
-    group by 1,2
-) a
-left join 
-(
-    select cityCode, sum(m11PlanSignAmount) plansignamount
-    from fdc_dws.dws_proj_projplansum_a_h where partitiondate = current_date
-    and years = left(current_date, 4)
-    group by citycode
-) b on a.citycode = b.citycode""")
+    dws_connect("""select a.cityname as 公司, a.subscramount/nullif(b.plansignamount, 0) as 认签比, a.subscramount as 月度新增认购金额, b.plansignamount as 月度签约任务, nvl(a.subscramount/nullif(b.plansignamount, 0), 0) - EXTRACT(DAY FROM CURRENT_DATE)::FLOAT / EXTRACT(DAY FROM last_day(current_date)) as 认签比达成进度 from (select citycode, cityname, sum(subscramount) as subscramount from fdc_dwd.dwd_trade_roomsubscr_a_min where partitiondate = current_date and subscrexecdate between date_trunc('month', current_date) and current_date and (subscrstatus = '激活' or closereason = '转签约') group by 1,2) a left join (select cityCode, sum(m11PlanSignAmount) as plansignamount from fdc_dws.dws_proj_projplansum_a_h where partitiondate = current_date and years = left(current_date, 4) group by citycode) b on a.citycode = b.citycode;""")

@@ -73,12 +73,12 @@ system_prompt_indicator_template = """
 """
 
 system_prompt_subsignrate = """
-认签比和认签比达成进度是两个需要计算的指标，默认按本月进行计算，其计算规则是
+认签比和认签达成进度是两个需要计算的指标，默认按本月进行计算，其计算规则是
 select a.cityname as 公司,
 a.subscramount/nullif(b.plansignamount, 0) as 认签比,
 a.subscramount as 月度新增认购金额,
 b.plansignamount as 月度签约任务,
-nvl(a.subscramount/nullif(b.plansignamount, 0), 0) - EXTRACT(DAY FROM CURRENT_DATE)::FLOAT / EXTRACT(DAY FROM last_day(current_date)) 认签比达成进度
+nvl(a.subscramount/nullif(b.plansignamount, 0), 0) - EXTRACT(DAY FROM CURRENT_DATE)::FLOAT / EXTRACT(DAY FROM last_day(current_date)) 认签达成进度
 from 
 (
     select citycode, cityname, sum(subscramount) as subscramount
@@ -108,7 +108,7 @@ left join
 示例：查询当月认签比。
 回答：
 {
-    "sql:"select a.cityname as 公司, a.subscramount/nullif(b.plansignamount, 0) as 认签比, a.subscramount as 月度新增认购金额, b.plansignamount as 月度签约任务, nvl(a.subscramount/nullif(b.plansignamount, 0), 0) - EXTRACT(DAY FROM CURRENT_DATE)::FLOAT / EXTRACT(DAY FROM last_day(current_date)) as 认签比达成进度 from (select citycode, cityname, sum(subscramount) as subscramount from fdc_dwd.dwd_trade_roomsubscr_a_min where partitiondate = current_date and subscrexecdate between date_trunc('month', current_date) and current_date and (subscrstatus = '激活' or closereason = '转签约') group by 1,2) a left join (select cityCode, sum(m11PlanSignAmount) as plansignamount from fdc_dws.dws_proj_projplansum_a_h where partitiondate = current_date and years = left(current_date, 4) group by citycode) b on a.citycode = b.citycode;"
+    "sql:"select a.cityname as 公司, a.subscramount/nullif(b.plansignamount, 0) as 认签比, a.subscramount as 月度新增认购金额, b.plansignamount as 月度签约任务, nvl(a.subscramount/nullif(b.plansignamount, 0), 0) - EXTRACT(DAY FROM CURRENT_DATE)::FLOAT / EXTRACT(DAY FROM last_day(current_date)) as 认签达成进度 from (select citycode, cityname, sum(subscramount) as subscramount from fdc_dwd.dwd_trade_roomsubscr_a_min where partitiondate = current_date and subscrexecdate between date_trunc('month', current_date) and current_date and (subscrstatus = '激活' or closereason = '转签约') group by 1,2) a left join (select cityCode, sum(m11PlanSignAmount) as plansignamount from fdc_dws.dws_proj_projplansum_a_h where partitiondate = current_date and years = left(current_date, 4) group by citycode) b on a.citycode = b.citycode;"
 }
 """
 
@@ -316,11 +316,14 @@ def chat():
             # 根据session_id获取历史消息，查询华菁数据库nh_chat_history表中CONTENT字段，注意需要去除id的内容。若为空，则说明开启的是新会话，返回NULL
             session_messages = get_session_messages(current_session_id)
             # 根据session_id获取使用到的表，查询华菁数据库nh_chat_history表中DATA_SET_JSON字段获取
-            if process_user_input_dict["status"] == 2:
+            is_1_indicator = False
+            if process_user_input_dict['status'] == 1 and process_user_input_dict["is_indicator"]:
+                is_1_indicator = True
+            if process_user_input_dict["status"] == 2 or is_1_indicator:
                 print(
                     f"识别到指标问数，匹配到指标：{process_user_input_dict['indicator_name']}"
                 )
-                if process_user_input_dict["indicator_name"] in ["认签比","签约完成率","认购缺口","签约达成率"]:
+                if process_user_input_dict["indicator_name"] in ["认签达成进度","认签比","签约完成率","认购缺口","签约达成率"]:
                     chosen_tables = {"fdc_dwd":["dwd_trade_roomsubscr_a_min"],"fdc_dws":["dws_proj_projplansum_a_h"]}
                 elif process_user_input_dict["indicator_name"] == "来访组数":
                     chosen_tables = {"fdc_dwd":"dwd_cust_custvisitflow_a_min"}
@@ -337,7 +340,7 @@ def chat():
             # 根据used_tables拼接获得数据字典
             data_dictionary_md = query_tables_description(used_tables)
 
-            if process_user_input_dict["status"] == 2:
+            if process_user_input_dict["status"] == 2 or is_1_indicator:
                 indicator_data = process_user_input_dict["indicator_data"]
                 indicator_name = process_user_input_dict["indicator_name"]
 
