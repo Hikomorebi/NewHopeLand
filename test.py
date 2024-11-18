@@ -15,16 +15,24 @@ def query_visitornum_info():
     try:
         with connection.cursor(cursor_factory=RealDictCursor) as cursor:
             sql = """
-
-                    SELECT 
-                        *                       
-                    FROM 
-                        fdc_ods.ods_qw_market_dh_crm_saleruser
-                    WHERE 
-                         createtime >= CURRENT_DATE - INTERVAL '3 month' AND createtime < CURRENT_DATE + INTERVAL '1 day'
-                        AND partitiondate >= CURRENT_DATE - INTERVAL '3 month' AND partitiondate < CURRENT_DATE + INTERVAL '1 day'
-                    LIMIT 3;
-        
+            WITH ranked_customers AS (
+                SELECT 
+                    u.username, u.visitamount,
+                    ROW_NUMBER() OVER (PARTITION BY u.username, u.mobile ORDER BY u.createtime DESC) as row_num
+                FROM 
+                    fdc_ods.ods_qw_market_dh_crm_saleruser u
+                WHERE 
+                    u.saleropenid = 'oFUZO53GCr93Bqk3-OhHaaCGFvvs' AND u.createtime >= CURRENT_DATE - INTERVAL '3 month' AND u.createtime < CURRENT_DATE + INTERVAL '1 day'
+                    AND u.partitiondate >= CURRENT_DATE - INTERVAL '1 day' AND u.partitiondate < CURRENT_DATE + INTERVAL '1 day'
+            )
+            SELECT 
+                username,visitamount ,
+                row_num
+            FROM 
+                ranked_customers
+            WHERE 
+                row_num = 1
+                ;
             """
             cursor.execute(sql)
             result = cursor.fetchall()

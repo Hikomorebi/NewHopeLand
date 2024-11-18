@@ -5,6 +5,7 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 import json
 import re
+import csv
 from info import(
     historical_data,
     knowledge_base,
@@ -335,11 +336,12 @@ def generate_model_suggestions_and_rank(customer_data):
 
     prompt = f"""
     {few_shot_examples}
-    根据以下客户的基本信息，生成有针对性的成交卡点、后续跟进计划以及意向等级并以json格式返回：
+    根据以下客户的基本信息，生成有针对性的意向分析、成交卡点、后续跟进计划以及意向等级并以json格式返回：
     {customer_info}
     返回结果应包含以下字段：
     - "成交卡点分析": 列表，每个元素包含卡点和详细说明
     - "后续跟进计划": 列表，每个元素包含时间、内容、方式
+    - "意向分析": 字符串，分析客户的意向情况
     - "意向等级": 字符串，表示客户的意向等级
     以严格的可直接处理的JSON字符串格式输出。
      意向等级包括：
@@ -365,12 +367,86 @@ def generate_model_suggestions_and_rank(customer_data):
             response_json = json.loads(api_response)
             return json.dumps(response_json, ensure_ascii=False)
         except json.JSONDecodeError as e:
-            print(f"解析API响应为JSON时出错: {e}")
+            print(f"调用通义千问 API 生成建议、计划和意向等级时解析API响应为JSON时出错: {e}")
             return "{}"
     except Exception as e:
-        print(f"调用API时出错: {e}")
+        print(f"调用通义千问 API 生成建议、计划和意向等级时出错: {e}")
         return "{}"
-    
+
+# 调用通义千问 API 提取 对比项目 和 未成交抗性
+def extract_model(customer_data, field):
+    customer_info = "客户白描:\n"
+    memo_value = customer_data.get('memo', '')  # 使用get方法安全地获取memo的值，如果不存在则返回空字符串
+    if memo_value:
+        customer_info += f"{memo_value}\n"
+    else:
+        # 如果memo字段为空，直接返回未知
+        return json.dumps({field: "未知"}, ensure_ascii=False)
+
+    prompt = f"""
+    根据以下客户的白描信息，提取出 {field} 并以json格式返回：
+    {customer_info}
+    返回结果应包含以下字段：
+    - "{field}": 字符串，表示房地产领域的相应字段信息
+    以严格的可直接处理的JSON字符串格式输出。
+    - 若确实无法从客户白描中提取到相应字段，将该字段赋值为 '未知' 后返回。
+    请直接返回JSON格式的数据，不需要其他提示信息。
+    """
+
+    try:
+        response = client.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        
+        api_response = response.choices[0].message.content
+        # 打印API响应以进行调试
+        print(f"API响应: {api_response}")
+        
+        # 移除响应内容中的多余字符
+        api_response = api_response.strip().replace('```json', '').replace('```', '')
+        
+        if not api_response:
+            print("API响应为空")
+            return json.dumps({field: "未知"}, ensure_ascii=False)
+
+        try:
+            # 尝试将API响应解析为JSON
+            response_json = json.loads(api_response)
+            return json.dumps(response_json, ensure_ascii=False)
+        except json.JSONDecodeError as e:
+            print(f"调用通义千问 API 提取对比项目和未成交抗性 解析API响应为JSON时出错: {e}")
+            return json.dumps({field: "未知"}, ensure_ascii=False)
+    except Exception as e:
+        print(f"调用通义千问 API 提取对比项目和未成交抗性时出错: {e}")
+        return json.dumps({field: "未知"}, ensure_ascii=False)
+
+# 获取 对比项目 字段
+def get_comparison_projects(customer):
+    comparison_projects = customer.get('memo1', '')
+    if not comparison_projects:
+        # 调用extract_model前检查memo1是否为空
+        comparison_projects_response = extract_model(customer, '对比项目')
+        if comparison_projects_response:
+            comparison_projects_data = json.loads(comparison_projects_response)
+            comparison_projects = comparison_projects_data.get('对比项目', '未知')
+    return comparison_projects
+
+# 获取 未成交抗性 字段
+def get_non_deal_resistance(customer):
+    abandon_reason = customer.get('abandon_reason', '')
+    notbuyreason = customer.get('notbuyreason', '')
+    if abandon_reason and notbuyreason:
+        non_deal_resistance = abandon_reason + " " + notbuyreason
+    elif abandon_reason or notbuyreason:
+        non_deal_resistance = abandon_reason or notbuyreason
+    else:
+        non_deal_resistance_response = extract_model(customer, '未成交抗性')
+        if non_deal_resistance_response:
+            non_deal_resistance_data = json.loads(non_deal_resistance_response)
+            non_deal_resistance = non_deal_resistance_data.get('未成交抗性', '未知')
+    return non_deal_resistance
+
 # 连接数据库查询客户信息
 def query_customer_info(saleropenid):
     connection = psycopg2.connect(dbname="fdc_dc",
@@ -379,7 +455,7 @@ def query_customer_info(saleropenid):
                                   host="124.70.57.67",
                                   client_encoding='UTF8',
                                   port="8000")
-    print("连接成功！")
+    print("连接DWS数据库成功！")
 
     try:
         with connection.cursor(cursor_factory=RealDictCursor) as cursor:
@@ -388,22 +464,22 @@ def query_customer_info(saleropenid):
                 SELECT 
                     u.id, u.createtime, u.username, u.age, u.familystructure, u.mobile, 
                     u.qualified, u.visitcounts, u.budget, u.customerresource, u.mymttj, u.work, u.live, u.industry, u.jobs,
-                    u.house, u.purpose, u.floor, u.interest, u.notbuyreason, u.userrank, u.memo , u.saleropenid,
-                    u.buyuse, u.dealway, u.channel, u.unitprice, u.customerchannel, u.memo1, u.customer_id, u.income,
-                    u.area,
+                    u.house, u.purpose, u.floor, u.interest, u.userrank, u.memo , u.saleropenid,
+                    u.buyuse, u.dealway, u.channel, u.unitprice, u.customerchannel,  u.customer_id, u.income,
+                    u.area, u.visitamount, u.memo1, u.abandon_reason, u.notbuyreason, u.layouttype, u.buyfactor, u.interestlayout,
                     ROW_NUMBER() OVER (PARTITION BY u.username, u.mobile ORDER BY u.createtime DESC) as row_num
                 FROM 
                     fdc_ods.ods_qw_market_dh_crm_saleruser u
                 WHERE 
                     u.saleropenid = %s AND u.createtime >= CURRENT_DATE - INTERVAL '3 month' AND u.createtime < CURRENT_DATE + INTERVAL '1 day'
-                    AND u.partitiondate >= CURRENT_DATE - INTERVAL '3 month' AND u.partitiondate < CURRENT_DATE + INTERVAL '1 day'
+                    AND u.partitiondate >= CURRENT_DATE - INTERVAL '1 day' AND u.partitiondate < CURRENT_DATE + INTERVAL '1 day'
             )
             SELECT 
                 id, createtime, username, age, familystructure, mobile, 
                 qualified, visitcounts, budget, customerresource, mymttj, work, live, industry, jobs,
-                house, purpose, floor, interest, notbuyreason, userrank, memo , saleropenid,
-                buyuse, dealway, channel, unitprice, customerchannel, memo1, customer_id, income,
-                area,
+                house, purpose, floor, interest,  userrank, memo , saleropenid,
+                buyuse, dealway, channel, unitprice, customerchannel,  customer_id, income,
+                area, visitamount, memo1 , abandon_reason, notbuyreason, layouttype, buyfactor, interestlayout,
                 row_num
             FROM 
                 ranked_customers
@@ -420,7 +496,8 @@ def query_customer_info(saleropenid):
         return []
     finally:
         connection.close()
-# 连接数据库查询来访人数信息
+
+# 连接数据库查询来访人数信息[暂时不使用查询的方式；改用计数的方式]
 def query_visitornum_info():
     connection = psycopg2.connect(dbname="fdc_dc",
                                   user="dws_user_hwai",
@@ -428,10 +505,11 @@ def query_visitornum_info():
                                   host="124.70.57.67",
                                   client_encoding='UTF8',
                                   port="8000")
-    print("连接成功！")
+    print("连接DWS数据库成功！")
 
     try:
         with connection.cursor(cursor_factory=RealDictCursor) as cursor:
+            # TODO  在大量数据条目中区分特定的来访信息的逻辑待给出
             sql = """
                 SELECT 
                 visitornum,
@@ -456,33 +534,53 @@ def query_visitornum_info():
     finally:
         connection.close()
 
+# 从CSV文件中读取数据并建立销售人员ID和姓名的映射关系
+def build_saler_map_from_csv(file_path):
+    saler_map = {}
+    with open(file_path, mode='r', encoding='utf-8') as file:
+        reader = csv.DictReader(file)
+        for row in reader:
+            saler_id = row['saler_id']
+            saler_name = row['saler_name']
+            saler_map[saler_id] = saler_name
+    return saler_map
+
 # 生成 json 形式的报告
 def generate_json_report(customers):
-    # 尝试获取来访信息，如果失败则使用默认值
-    try:
-        result = query_visitornum_info()
-        if not result:
-            visit_info = {"visitornum": "未知", "newvisitornum": "未知", "revisitornum": "未知"}
-        else:
-            visit_info = result[0]
-    except Exception as e:
-        print(f"查询来访人数信息时发生错误: {e}")
-        visit_info = {"visitornum": "未知", "newvisitornum": "未知", "revisitornum": "未知"}
- 
-    visitornum = visit_info.get('visitornum', '未知')
-    newvisitornum = visit_info.get('newvisitornum', '未知')
-    revisitornum = visit_info.get('revisitornum', '未知')
-    
+
+    # 设置存储销售人员信息的csv文件的系统路径并构建映射关系
+    role_csv_file_path = 'role.csv'
+    saler_map = build_saler_map_from_csv(role_csv_file_path)
+
+    visitornum = 0  # 来访客户总数
+    newvisitornum = 0  # 新增来访客户数
+    revisitornum = 0  # 复访客户数
+
     report = {
         "来访客户": visitornum,
         "新增来访": newvisitornum,
         "复访客户": revisitornum,
-        "客户分析": []
+        "新访": [],
+        "复访":[],
+        "高意向客户":[]
     }
 
     for customer in customers:
+        visitornum += 1  # 来访客户数加1
+        # 从映射关系中获取销售人员姓名
+        saler_name = saler_map.get(customer.get('saleropenid', '未知'), '未知')
+        # 从来访次数字段判断是新访、复访
+        # 确保 visitamount 是整数类型
+        visitamount = int(customer.get('visitamount', 0))
+        # 通过RAG模型判断向量化的历史相似客户案例
+        new_customer_description = f"购房用途：{customer['buyuse']}，意向面积：{customer['area']}，家庭构成：{customer['familystructure']}，预算：{customer['budget']}，购房关注点：{customer['interest']}，客户简介：{customer['memo']}，用户评级：{customer['userrank']}。"
+        similar_customer = find_similar_customers(new_customer_description, knowledge_base, historical_data)
+        # 获取 对比项目 字段和 未成交抗性
+        comparison_projects =get_comparison_projects(customer)
+        non_deal_resistance = get_non_deal_resistance(customer)
+        # 调用大模型API获取意向分析、成交卡点、后续跟进计划以及意向等级
         suggestions_and_rank = generate_model_suggestions_and_rank(customer)
-        print("API返回的JSON数据:", suggestions_and_rank)  # 打印API返回的JSON数据
+        print("API返回了一条顾客的JSON数据")  # 打印API调用信息{可以用 suggestions_and_rank}
 
         try:
             # 尝试将API返回的JSON字符串解析为Python字典
@@ -491,22 +589,51 @@ def generate_json_report(customers):
             print(f"解析API返回的JSON数据时出错: {e}")
             continue
 
-        # 确保suggestions_and_rank_data包含所需的字段
+        # 确保suggestions_and_rank_data包含所需的字段：意向等级
         if  "意向等级" in suggestions_and_rank_data:
 
             intent_level = suggestions_and_rank_data["意向等级"]
-
             # 使用正则表达式从意向等级中提取字母部分
             intent_level_code = re.sub(r'[^A-Z]', '', intent_level)
-
-            if intent_level_code in ["A", "B", "C"]:
-
-                new_customer_description = f"购房用途：{customer['buyuse']}，意向面积：{customer['area']}，家庭构成：{customer['familystructure']}，预算：{customer['budget']}，购房关注点：{customer['interest']}，客户简介：{customer['memo']}，用户评级：{customer['userrank']}。"
-                similar_customer = find_similar_customers(new_customer_description, knowledge_base, historical_data)
-
+            # 符合高意向客户的标准，则添加进高意向客户JSON键
+            if intent_level_code in ["A", "B"]:
                 customer_report = {
-
+                    "序号": customer.get('id','未知'),
+                    "日期":customer.get('createtime','未知'),
                     "置业顾问ID": customer.get('saleropenid', '未知'),
+                    "置业顾问姓名":saler_name,
+                    "客户姓名": customer.get('username', '未知'),  
+                    "意向度": customer.get('userrank', '未知'),
+                    "高意向分析":suggestions_and_rank_data.get("意向分析", "未知"),
+                    "年龄": customer.get('age', '未知'),  
+                    "家庭结构": customer.get('familystructure', '未知'),
+                    "电话": customer.get('mobile', '未知'),                      
+                    "客户来源(前台咨客录入的来源)": customer.get('customerresource', '未知'),
+                    "需求户型": customer.get('purpose', '未知'),
+                    "意向楼栋": customer.get('floor', '未知'),
+                    "意向房源一": customer.get('layouttype', '未知'),
+                    "意向房源二": customer.get('buyfactor', '未知'),
+                    "客户关注点": customer.get('interest', '未知'),
+                    "客户对项目满意点": customer.get('interestlayout', '未知'),
+                    "对比项目": comparison_projects,                   
+                    "未成交抗性": non_deal_resistance,
+                    "未成交原因分类": customer.get('abandon_reason', '未知'),                   
+                    "意向等级": intent_level,
+                    "客户白描": customer.get('memo', '未知'),
+                    "历史相似客户": similar_customer,
+                    "成交卡点": suggestions_and_rank_data.get("成交卡点分析", []),  
+                    "跟进建议": suggestions_and_rank_data.get("后续跟进计划", [])
+                }
+
+                report["高意向客户"].append(customer_report)
+
+            if  visitamount == 0:
+                newvisitornum += 1  # 新增来访客户数加1
+                customer_report = {
+                    "序号": customer.get('id','未知'),
+                    "日期":customer.get('createtime','未知'),
+                    "置业顾问ID": customer.get('saleropenid', '未知'),
+                    "置业顾问姓名":saler_name,
                     "客户姓名": customer.get('username', '未知'),  
                     "年龄": customer.get('age', '未知'),  
                     "家庭结构": customer.get('familystructure', '未知'),
@@ -525,42 +652,69 @@ def generate_json_report(customers):
                     "目前居住的面积": customer.get('house', '未知'),
                     "需求户型": customer.get('purpose', '未知'),
                     "意向楼栋": customer.get('floor', '未知'),
-                    # 假设正确的意向房源一键名为 'favorite_house_1'
-                    "意向房源一": customer.get('favorite_house_1', '待定'),
-                    # 假设正确的意向房源二键名为 'favorite_house_2'
-                    "意向房源二": customer.get('favorite_house_2', '待定'),
+                    # 假设正确的意向房源一键名
+                    "意向房源一": customer.get('layouttype', '待定'),
+                    # 假设正确的意向房源二键名
+                    "意向房源二": customer.get('buyfactor', '待定'),
                     "客户关注点": customer.get('interest', '未知'),
-                    # 假设正确的客户对项目满意点键名为 'satisfaction_points'
-                    "客户对项目满意点": customer.get('satisfaction_points', '待定'),
-                    "对比项目": similar_customer,
-                    "未成交抗性": suggestions_and_rank_data.get("成交卡点分析", []),
-                    # 假设正确的未成交原因分类键名为 'non_deal_reason'
-                    "未成交原因分类": customer.get('non_deal_reason', '待定'),
-                    "意向度": customer.get('userrank', '未知'),
+                    # 假设正确的客户对项目满意点键名
+                    "客户对项目满意点": customer.get('interestlayout', '待定'),
+                    "对比项目": comparison_projects,
+                    "未成交抗性": non_deal_resistance,
+                    # 假设正确的未成交原因分类键名
+                    "未成交原因分类": customer.get('abandon_reason', '待定'),
                     "意向等级": intent_level,
                     "客户白描": customer.get('memo', '未知'),  
                     "跟进建议": suggestions_and_rank_data.get("后续跟进计划", [])
                 }
 
-                report["客户分析"].append(customer_report)
+                report["新访"].append(customer_report)
+
+            elif visitamount >= 1:
+                revisitornum += 1  # 复访客户数加1
+                customer_report = {
+                    "序号": customer.get('id','未知'),
+                    "日期":customer.get('createtime','未知'),
+                    "置业顾问ID": customer.get('saleropenid', '未知'),
+                    "置业顾问姓名":saler_name,
+                    "客户姓名": customer.get('username', '未知'),  
+                    "年龄": customer.get('age', '未知'),  
+                    "家庭结构": customer.get('familystructure', '未知'),
+                    "电话": customer.get('mobile', '未知'),  
+                    "是否具有购房资格": customer.get('qualified', '未知'),
+                    "置业次数": customer.get('visitcounts', '未知'),
+                    # 假设正确的首付预算键名为 'downpayment_budget'
+                    "首付预算": customer.get('downpayment_budget', '待定'),
+                    "总价预算": customer.get('budget', '未知'),  
+                    "客户来源": customer.get('customerresource', '未知'),
+                    "认知途径": customer.get('mymttj', '未知'),
+                    "工作区域": customer.get('work', '未知'),
+                    "居住区域": customer.get('live', '未知'),
+                    "行业": customer.get('industry', '未知'),
+                    "职务": customer.get('jobs', '未知'),
+                    "目前居住的面积": customer.get('house', '未知'),
+                    "需求户型": customer.get('purpose', '未知'),
+                    "意向楼栋": customer.get('floor', '未知'),
+                    # 假设正确的意向房源一键名
+                    "意向房源一": customer.get('layouttype', '待定'),
+                    # 假设正确的意向房源二键名
+                    "意向房源二": customer.get('buyfactor', '待定'),
+                    "客户关注点": customer.get('interest', '未知'),
+                    # 假设正确的客户对项目满意点键名
+                    "客户对项目满意点": customer.get('interestlayout', '待定'),
+                    "对比项目": comparison_projects,
+                    "未成交抗性": non_deal_resistance,
+                    # 假设正确的未成交原因分类键名
+                    "未成交原因分类": customer.get('abandon_reason', '待定'),
+                    "意向等级": intent_level,
+                    "客户白描": customer.get('memo', '未知'),  
+                    "跟进建议": suggestions_and_rank_data.get("后续跟进计划", [])
+                }
+
+                report["复访"].append(customer_report)
+    
+    report["来访客户"] = visitornum
+    report["新增来访"] = newvisitornum
+    report["复访客户"] = revisitornum
 
     return report
-
-# def main():
-#     saleropenid = input("请输入销售人员ID: ")
-#     customers = query_customer_info(saleropenid)
-#     if not customers:
-#         print("未查询到相关客户信息。")
-#         return
-
-#     json_report = generate_json_report(customers)
-
-#     report_filename = f"高意向客户分析报告_{saleropenid}.json"
-#     with open(report_filename, "w", encoding="utf-8") as file:
-#         # 美化输出JSON
-#         json.dump(json_report, file, ensure_ascii=False, indent=4)
-
-#     print(f"报告已生成并保存在 {report_filename}")
-
-# if __name__ == "__main__":
-#     main()
