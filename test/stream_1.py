@@ -6,7 +6,7 @@ import time
 
 def post_chat(query):
     # 接口地址
-    url = "http://me.ilisa.team:45108/chat"
+    url = "http://me.ilisa.team:45109/chat"
     headers = {"Content-Type": "application/json"}
     #data = {"session_id":"2","query": query,"dataSource":'{"fdc_dws":["dws_proj_room_totalsale_a_min"]}'}
     data = {"session_id":"3","query": query,"dataSource":''}
@@ -59,4 +59,4 @@ def post_chat(query):
         print("Exception occurred:", str(e))
 
 
-post_chat("其中温州立体城的是多少？")
+post_chat("查询2022年6月份的认签比是多少？")

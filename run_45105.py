@@ -289,14 +289,14 @@ def chat():
                     mategen = MateGen(
                         api_key=os.getenv("OPENAI_API_KEY"),
                         base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
-                        model="qwen-turbo",
+                        model="qwen-plus",
                         system_content_list=[system_prompt_subsignrate],
                     )
                 elif indicator_name == "签约完成率":
                     mategen = MateGen(
                         api_key=os.getenv("OPENAI_API_KEY"),
                         base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
-                        model="qwen-turbo",
+                        model="qwen-plus",
                         system_content_list=[system_prompt_signrate],
                     )
                 else:
@@ -308,7 +308,7 @@ def chat():
                     mategen = MateGen(
                         api_key=os.getenv("OPENAI_API_KEY"),
                         base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
-                        model="qwen-turbo",
+                        model="qwen-plus",
                         system_content_list=[system_prompt_indicator],
                     )
             else:
@@ -317,7 +317,7 @@ def chat():
                 mategen = MateGen(
                     api_key=os.getenv("OPENAI_API_KEY"),
                     base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
-                    model="qwen-turbo",
+                    model="qwen-plus",
                     system_content_list=[
                         system_prompt_common.replace("<few_shots>", few_shots)
                     ],
