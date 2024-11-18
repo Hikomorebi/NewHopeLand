@@ -37,7 +37,8 @@ system_prompt_common = """
 6. 如果用户请求的是一段时间内的数据，请确保SQL语句能够正确提取这段时间内的数据。如询问当日的数据，可以使用 current_date 作为筛选条件。如果问题涉及到今年或者本月，请自动理解为当前时间为2024年11月。
 7. 生成的SQL语句不能涵盖非法字符如"\n"。
 8. 生成的SQL语句选择的字段分为核心字段和相关字段，核心字段是与用户需求连接最紧密的字段，相关字段是与用户需求相关的其他字段，用于确保信息的完整性。请将核心字段放入返回要求格式的 key_fields 参数值中。
-9. 请从如下给出的展示方式种选择最优的一种用以进行数据渲染，将类型名称放入返回要求格式的 display_type 参数值中，可用数据展示方式如下:
+9. 若用户提问中涉及项目名称，请提取项目名称作为模糊匹配的筛选条件。项目名称可能包含城市名，应视为一个完整的字符串，不要拆分。如"成都皇冠湖壹号","温州立体城"可以通过"%皇冠湖壹号%"和"%立体城%"进行模糊匹配。
+10. 请从如下给出的展示方式种选择最优的一种用以进行数据渲染，将类型名称放入返回要求格式的 display_type 参数值中，可用数据展示方式如下:
 {
     "response_line_chart": "用于显示对比趋势分析数据",
     "response_pie_chart": "适用于比例和分布统计场景",
@@ -63,7 +64,7 @@ system_prompt_indicator_template = """
 3. 请确保所有字段和条件都使用具体的值。禁止随意假设不存在的信息。请务必确保生成的SQL语句能够直接运行。
 4. 如果数据字典中存在 partitiondate 字段，请在生成SQL语句的筛选条件中加入 partitiondate = current_date 。如果计算规则中存在 partitiondate 字段，则将该字段值筛选条件设为 current_date 。
 5. 如果用户请求的是一段时间内的数据，请确保SQL语句能够正确提取这段时间内的数据。如询问当日的数据，可以使用 current_date 作为筛选条件。如果问题涉及到当月或本月，请按照当前月份2024年11月份进行计算。
-7. 若用户提问中涉及项目名称，请提取项目名称作为筛选条件。项目名称可能包含城市名，应视为一个完整的字符串，不要拆分。如"成都皇冠湖壹号","温州立体城"才是完整的项目名称。
+6. 若用户提问中涉及项目名称，请提取项目名称作为模糊匹配的筛选条件。项目名称可能包含城市名，应视为一个完整的字符串，不要拆分。如"成都皇冠湖壹号","温州立体城"可以通过"%皇冠湖壹号%"和"%立体城%"进行模糊匹配。
 请严格按照计算规则的逻辑给出SQL代码，并按照以下JSON格式响应：
 {{
     "sql": "SQL Query to run",
@@ -72,33 +73,31 @@ system_prompt_indicator_template = """
 """
 
 system_prompt_subsignrate = """
-认签比是一个需要计算的指标，默认按月份进行计算，其计算规则是
-select 
-    p.projcode,
-    p.projname,
-    p.${month}PlanSignAmount as ${month_zh}月任务, -- 动态月份任务
-    sum(t.taxAmount) as 新增认购金额,
-    case 
-        when p.${month}PlanSignAmount > 0 then sum(t.taxAmount) / p.${month}PlanSignAmount
-        else null
-    end as ${month_zh}月认签比 -- 动态月份认签比
+认签比和认签比达成进度是两个需要计算的指标，默认按本月进行计算，其计算规则是
+select a.cityname as 公司,
+a.subscramount/nullif(b.plansignamount, 0) as 认签比,
+a.subscramount as 月度新增认购金额,
+b.plansignamount as 月度签约任务,
+nvl(a.subscramount/nullif(b.plansignamount, 0), 0) - EXTRACT(DAY FROM CURRENT_DATE)::FLOAT / EXTRACT(DAY FROM last_day(current_date)) 认签比达成进度
 from 
-    fdc_dws.dws_proj_projplansum_a_h p
+(
+    select citycode, cityname, sum(subscramount) as subscramount
+    from fdc_dwd.dwd_trade_roomsubscr_a_min 
+    where partitiondate = current_date 
+    and subscrexecdate between date_trunc('month', current_date) and current_date and (subscrstatus = '激活' or closereason = '转签约')
+    group by 1,2
+) a
 left join 
-    fdc_dwd.dwd_trade_roomsubscr_a_min t
-on
-    p.projcode = t.projcode
-    and t.partitiondate = current_date
-    and t.subscrexecdate between '${startdate}' and '${enddate}'
-    and t.closeDate > '${enddate}'
-where 
-    p.partitiondate = current_date
-    and p.years = '${year}'
-group by 
-    p.projcode, p.projname, p.${month}PlanSignAmount;
+(
+    select cityCode, sum(${month}PlanSignAmount) plansignamount
+    from fdc_dws.dws_proj_projplansum_a_h where partitiondate = current_date
+    and years = left(current_date, 4)
+    group by citycode
+) b on a.citycode = b.citycode;
+其中模板变量 ${month} 被用来动态生成查询条件，如果当前月份是1月，则 ${month} 会被替换为 m1，生成字段名 m1PlanSignAmount。
 你是一名数据库专家，请根据计算规则生成正确的PostgreSQL语句。要求如下：
 1. 请仔细阅读并理解用户的请求。参考数据库字典提供的表结构和各字段信息，根据计算规则生成正确的PostgreSQL语句。
-2. 请完全按照提供的计算规则模板来设计SQL语句，不要修改计算规则的结构，同时如果计算规则中带有'$'符号作为占位符，需要从用户问题中提取相关的时间等信息来填充占位符。请确保所有占位符都被具体的值填充。
+2. 请完全按照提供的计算规则模板来设计SQL语句，不要修改计算规则的结构，计算规则中带有'$'符号作为占位符，你需要从用户问题中提取相关的时间等信息来填充占位符。请确保所有占位符都被具体的值填充。
 3. 请确保所有字段和条件都使用具体的值。禁止随意假设不存在的信息。请务必确保生成的SQL语句能够直接运行。
 4. 如果未指定具体月份，请按照当前月份2024年11月份进行计算。
 请严格按照计算规则的逻辑给出SQL代码，并按照以下JSON格式响应：
@@ -106,52 +105,44 @@ group by
     "sql": "SQL Query to run",
 }
 要求只返回最终的json对象，不要包含其余内容。
-示例：查询2021年2月份的认签比。
+示例：查询当月认签比。
 回答：
 {
-    "sql:"select p.projcode, p.projname, p.m2PlanSignAmount as 二月任务, sum(t.taxAmount) as 新增认购金额, case when p.m2PlanSignAmount > 0 then sum(t.taxAmount) / p.m2PlanSignAmount else null end as 二月认签比 from fdc_dws.dws_proj_projplansum_a_h p left join fdc_dwd.dwd_trade_roomsubscr_a_min t on p.projcode = t.projcode and t.partitiondate = current_date and t.subscrexecdate between '2021-01-01' and '2021-12-31' and t.closeDate > '2021-12-31' where p.partitiondate = current_date and p.years = '2021' group by p.projcode, p.projname, p.m2PlanSignAmount;"
+    "sql:"select a.cityname as 公司, a.subscramount/nullif(b.plansignamount, 0) as 认签比, a.subscramount as 月度新增认购金额, b.plansignamount as 月度签约任务, nvl(a.subscramount/nullif(b.plansignamount, 0), 0) - EXTRACT(DAY FROM CURRENT_DATE)::FLOAT / EXTRACT(DAY FROM last_day(current_date)) as 认签比达成进度 from (select citycode, cityname, sum(subscramount) as subscramount from fdc_dwd.dwd_trade_roomsubscr_a_min where partitiondate = current_date and subscrexecdate between date_trunc('month', current_date) and current_date and (subscrstatus = '激活' or closereason = '转签约') group by 1,2) a left join (select cityCode, sum(m11PlanSignAmount) as plansignamount from fdc_dws.dws_proj_projplansum_a_h where partitiondate = current_date and years = left(current_date, 4) group by citycode) b on a.citycode = b.citycode;"
 }
 """
 
 system_prompt_signrate = """
-签约完成率是一个需要计算的指标，默认按月份进行计算，其计算规则是
-select 
-    p.projcode,
-    p.projname,
-    p.${month}PlanSignAmount as ${month_zh}月任务, -- 动态月份任务
-    sum(
-        nvl(t.contrtotalprice, 0) + 
-        nvl(t.firstdecoraterenosum, 0) + 
-        (case when t.fitmentpriceiscontr = '0' then nvl(t.decoratetotalprice, 0) else 0 end)
-    ) as 新增签约金额,
-    case 
-        when p.${month}PlanSignAmount > 0 then 
-            sum(
-                nvl(t.contrtotalprice, 0) + 
-                nvl(t.firstdecoraterenosum, 0) + 
-                (case when t.fitmentpriceiscontr = '0' then nvl(t.decoratetotalprice, 0) else 0 end)
-            ) / p.${month}PlanSignAmount
-        else null
-    end as ${month_zh}月签约完成率
-from 
-    fdc_dws.dws_proj_projplansum_a_h p
-left join 
-    fdc_dwd.dwd_trade_roomsign_a_min t
-on 
-    p.projcode = t.projcode
-where 
-    p.partitiondate = current_date 
-    and t.partitiondate = current_date
-    and t.signexecdate between '${startdate}' and '${enddate}'
-    and t.closedate > '${enddate}'
-    and p.years = '${year}'
-group by 
-    p.projcode, 
-    p.projname, 
-    p.${month}PlanSignAmount;
+签约达成率是一个需要计算的指标，其计算规则是
+select cm_signamount/nullif(cm_plansignamount, 0) as ${month_zh}月签约达成率
+,cm_signamount as ${month_zh}月签约金额
+,cm_plansignamount as ${month_zh}月计划签约金额
+,cq_signamount/nullif(cq_plansignamount, 0) as ${quarter_zh}季度签约达成率
+,cy_signamount/nullif(cy_plansignamount, 0) as ${year_zh}年签约达成率
+from
+(
+    select sum(${month}PlanSignAmount) as cm_plansignamount
+    ,sum(${quarter}PlanSignAmount) as cq_plansignamount
+    ,sum(yearPlanSignAmount) as cy_plansignamount
+    from fdc_dws.dws_proj_projplansum_a_h where partitiondate = current_date
+    and years = '${year}'
+) a
+,(
+    select sum(case when signdate between  date_trunc('month', DATE '${startdate}') and DATE '${enddate}' then contrTotalprice else null end) as cm_signamount
+    ,sum(case when signdate between date_trunc('quarter', DATE '${startdate}') and DATE '${enddate}' then contrTotalprice else null end) as cq_signamount
+    ,sum(case when signdate between date_trunc('year', DATE '${startdate}') and DATE '${enddate}' then contrTotalprice else null end) as cy_signamount
+    from
+    (
+        select signexecdate as signdate, nvl(contrtotalprice, 0) + nvl(firstdecoraterenosum, 0) + (case when fitmentpriceiscontr = '0' then nvl(decoratetotalprice, 0) else 0 end) as contrtotalprice
+        from fdc_dwd.dwd_trade_roomsign_a_min
+        where partitiondate = current_date
+        and closedate > '${enddate}'
+    ) 
+);
+其中模板变量 ${month} ， ${quarter} 和 ${year} 被用来动态生成查询条件，如果当前月份是1月，则 ${month} 会被替换为 m1，生成字段名 m1PlanSignAmount。如果当前季度是第一季度，则 ${quarter} 会被替换为 q1，生成字段名 q1PlanSignAmount。如果当前是2024年，则 ${year} 会被替换为 2024。
 你是一名数据库专家，请根据计算规则生成正确的PostgreSQL语句。要求如下：
 1. 请仔细阅读并理解用户的请求。参考数据库字典提供的表结构和各字段信息，根据计算规则生成正确的PostgreSQL语句。
-2. 请完全按照提供的计算规则模板来设计SQL语句，不要修改计算规则的结构，同时如果计算规则中带有'$'符号作为占位符，需要从用户问题中提取相关的时间等信息来填充占位符。请确保所有占位符都被具体的值填充。
+2. 请完全按照提供的计算规则模板来设计SQL语句，不要修改计算规则的结构，计算规则中带有'$'符号作为占位符，你需要从用户问题中提取相关的时间等信息来填充占位符。请确保所有占位符都被具体的值填充。
 3. 请确保所有字段和条件都使用具体的值。禁止随意假设不存在的信息。请务必确保生成的SQL语句能够直接运行。
 4. 如果未指定具体月份，请按照当前月份2024年11月份进行计算。
 请严格按照计算规则的逻辑给出SQL代码，并按照以下JSON格式响应：
@@ -159,10 +150,10 @@ group by
     "sql": "SQL Query to run",
 }
 要求只返回最终的json对象，不要包含其余内容。
-示例：查询2024年1月份所有项目的签约完成率。
+示例：查询2024年一月份的签约达成率。
 回答：
 {
-    "sql:"select p.projcode, p.projname, p.m1PlanSignAmount as 一月任务, sum(nvl(t.contrtotalprice, 0) + nvl(t.firstdecoraterenosum, 0) + (case when t.fitmentpriceiscontr = '0' then nvl(t.decoratetotalprice, 0) else 0 end)) as 新增签约金额, case when p.m1PlanSignAmount > 0 then sum(nvl(t.contrtotalprice, 0) + nvl(t.firstdecoraterenosum, 0) + (case when t.fitmentpriceiscontr = '0' then nvl(t.decoratetotalprice, 0) else 0 end)) / p.m1PlanSignAmount else null end as 一月签约完成率 from fdc_dws.dws_proj_projplansum_a_h p left join fdc_dwd.dwd_trade_roomsign_a_min t on p.projcode = t.projcode where p.partitiondate = current_date and t.partitiondate = current_date and t.signexecdate between '2024-01-01' and '2024-01-31' and t.closedate > '2024-01-31' and p.years = '2024' group by p.projcode, p.projname, p.m1PlanSignAmount;"
+    "sql:"SELECT cm_signamount / NULLIF(cm_plansignamount, 0) AS 一月签约达成率, cm_signamount AS 一月签约金额, cm_plansignamount AS 一月计划签约金额, cq_signamount / NULLIF(cq_plansignamount, 0) AS 一季度签约达成率, cy_signamount / NULLIF(cy_plansignamount, 0) AS 当年签约达成率 FROM (SELECT SUM(m1PlanSignAmount) AS cm_plansignamount, SUM(q1PlanSignAmount) AS cq_plansignamount, SUM(yearPlanSignAmount) AS cy_plansignamount FROM fdc_dws.dws_proj_projplansum_a_h WHERE partitiondate = CURRENT_DATE AND years = '2024') a, (SELECT SUM(CASE WHEN signdate BETWEEN DATE_TRUNC('month', DATE '2024-01-01') AND DATE '2024-01-31' THEN contrTotalprice ELSE NULL END) AS cm_signamount, SUM(CASE WHEN signdate BETWEEN DATE_TRUNC('quarter', DATE '2024-01-01') AND DATE '2024-01-31' THEN contrTotalprice ELSE NULL END) AS cq_signamount, SUM(CASE WHEN signdate BETWEEN DATE_TRUNC('year', DATE '2024-01-01') AND DATE '2024-01-31' THEN contrTotalprice ELSE NULL END) AS cy_signamount FROM (SELECT signexecdate AS signdate, NVL(contrtotalprice, 0) + NVL(firstdecoraterenosum, 0) + (CASE WHEN fitmentpriceiscontr = '0' THEN NVL(decoratetotalprice, 0) ELSE 0 END) AS contrtotalprice FROM fdc_dwd.dwd_trade_roomsign_a_min WHERE partitiondate = CURRENT_DATE AND closedate > '2024-01-31')) b;"
 }
 """
 system_prompt_gap = """
@@ -198,7 +189,39 @@ from (
     "sql:"select nvl(a.plansignamount, 0) - nvl(b.subscramount, 0) as 认购缺口, a.plansignamount as 月度签约任务, b.subscramount as 月度新增认购金额 from (select sum(m11PlanSignAmount) plansignamount from fdc_dws.dws_proj_projplansum_a_h where partitiondate = current_date and years = 2024) a, (select sum(subscramount) as subscramount from fdc_dwd.dwd_trade_roomsubscr_a_min where partitiondate = current_date and subscrexecdate between '2024-11-01' and '2024-11-30' and (subscrstatus = '激活' or closereason = '转签约')) b;"
 }
 """
-
+system_prompt_visit = """
+来访组数是一个需要计算的指标，其计算规则是
+with visitflow as (
+    select projcode
+    ,saleruserid
+    ,isvisit as isrevisit
+    ,visitdate
+    ,min(visitdate) over(partition by saleruserid, isvisit) min_visitdate
+    from fdc_dwd.dwd_cust_custvisitflow_a_min
+    where partitiondate = current_date
+)
+select count(distinct case when isrevisit = '否' then saleruserid else null end) + count(distinct case when isrevisit = '是' then saleruserid else null end) as 来访组数
+from visitflow a
+where (isrevisit = '是' or visitdate = min_visitdate)
+and left(visitdate, 10) between '${startdate}' and '${enddate}';
+其中模板变量 ${startdate} 和 ${enddate} 被用来限定时间范围。
+你是一名数据库专家，请根据计算规则生成正确的PostgreSQL语句。要求如下：
+1. 请仔细阅读并理解用户的请求。参考数据库字典提供的表结构和各字段信息，根据计算规则生成正确的PostgreSQL语句。
+2. 请完全按照提供的计算规则模板来设计SQL语句，不要修改计算规则的结构，计算规则中带有'$'符号作为占位符，需要从用户问题中提取相关的时间等信息来填充占位符。请确保所有占位符都被具体的值填充。
+3. 请确保所有字段和条件都使用具体的值。禁止随意假设不存在的信息。请务必确保生成的SQL语句能够直接运行。
+4. 如果未指定具体月份，请按照当前月份2024年11月份进行计算。
+请严格按照计算规则的逻辑给出SQL代码，并按照以下JSON格式响应：
+{
+    "sql": "SQL Query to run",
+}
+要求只返回最终的json对象，不要包含其余内容。
+示例：
+问题：2024年国庆期间的来访组数是多少？
+回答：
+{
+    "sql:"with visitflow as (select projcode, saleruserid, isvisit as isrevisit, visitdate, min(visitdate) over(partition by saleruserid, isvisit) min_visitdate from fdc_dwd.dwd_cust_custvisitflow_a_min where partitiondate = current_date) select count(distinct case when isrevisit = '否' then saleruserid else null end) + count(distinct case when isrevisit = '是' then saleruserid else null end) as 来访组数 from visitflow a where (isrevisit = '是' or visitdate = min_visitdate) and left(visitdate, 10) between '2024-10-01' and '2024-10-07';"
+}
+"""
 mategen_dict = {}
 all_tables = {
     "fdc_ads": [
@@ -297,8 +320,10 @@ def chat():
                 print(
                     f"识别到指标问数，匹配到指标：{process_user_input_dict['indicator_name']}"
                 )
-                if process_user_input_dict["indicator_name"] in ["认签比","签约完成率","认购缺口"]:
+                if process_user_input_dict["indicator_name"] in ["认签比","签约完成率","认购缺口","签约达成率"]:
                     chosen_tables = {"fdc_dwd":["dwd_trade_roomsubscr_a_min"],"fdc_dws":["dws_proj_projplansum_a_h"]}
+                elif process_user_input_dict["indicator_name"] == "来访组数":
+                    chosen_tables = {"fdc_dwd":"dwd_cust_custvisitflow_a_min"}
                 else:
                     chosen_tables = select_table_based_on_indicator(
                         process_user_input_dict["indicator_data"]["数据来源"]
@@ -323,7 +348,7 @@ def chat():
                         model="qwen-plus",
                         system_content_list=[system_prompt_subsignrate],
                     )
-                elif indicator_name == "签约完成率":
+                elif indicator_name == "签约完成率" or indicator_name == "签约达成率":
                     mategen = MateGen(
                         api_key=os.getenv("OPENAI_API_KEY"),
                         base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
@@ -336,6 +361,13 @@ def chat():
                         base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
                         model="qwen-plus",
                         system_content_list=[system_prompt_gap],
+                    )
+                elif indicator_name == "来访组数":
+                    mategen = MateGen(
+                        api_key=os.getenv("OPENAI_API_KEY"),
+                        base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+                        model="qwen-plus",
+                        system_content_list=[system_prompt_visit],
                     )
                 else:
                     system_prompt_indicator = system_prompt_indicator_template.format(

@@ -52,7 +52,7 @@ def get_sql_results_json(translated_column_names, type_codes, results, sql_query
     response_columns = []
     for i in range(len(translated_column_names)):
         # 如果是数值型
-        if type_codes[i] == 1700:
+        if type_codes[i] in [1700,701,23]:
             numbers = [x for x in response_data[translated_column_names[i]] if x is not None]
             if numbers == []:
                 response_columns.append({"name":translated_column_names[i],"field_type":"指标","default_display":True if i in positions else False,"stats":{}})
@@ -719,4 +719,23 @@ def dict_intersection(dict1, dict2):
 if __name__ == "__main__":
 
     #dws_connect_test("select subtosign_period/newvisittosub_num as subtosignavgcycle,subtosign_num as subtosignunits from fdc_ads.ads_salesreport_subscranalyse_a_min where statdate = current_date")
-    dws_connect("""select nvl(a.plansignamount, 0) - nvl(b.subscramount, 0) as 认购缺口, a.plansignamount as 月度签约任务, b.subscramount as 月度新增认购金额 from (select sum(m11PlanSignAmount) plansignamount from fdc_dws.dws_proj_projplansum_a_h where partitiondate = current_date and years = 2024) a, (select sum(subscramount) as subscramount from fdc_dwd.dwd_trade_roomsubscr_a_min where partitiondate = current_date and subscrexecdate between '2024-11-01' and '2024-11-30' and (subscrstatus = '激活' or closereason = '转签约')) b;""")
+    dws_connect("""select a.cityname as 公司
+,a.subscramount/nullif(b.plansignamount, 0) as 认签比
+,a.subscramount as 月度新增认购金额
+,b.plansignamount as 月度签约任务
+,nvl(a.subscramount/nullif(b.plansignamount, 0), 0) - EXTRACT(DAY FROM CURRENT_DATE)::FLOAT / EXTRACT(DAY FROM last_day(current_date)) 认签比达成进度
+from 
+(
+    select citycode, cityname, sum(subscramount) as subscramount
+    from fdc_dwd.dwd_trade_roomsubscr_a_min 
+    where partitiondate = current_date 
+    and subscrexecdate between date_trunc('month', current_date) and current_date and (subscrstatus = '激活' or closereason = '转签约')
+    group by 1,2
+) a
+left join 
+(
+    select cityCode, sum(m11PlanSignAmount) plansignamount
+    from fdc_dws.dws_proj_projplansum_a_h where partitiondate = current_date
+    and years = left(current_date, 4)
+    group by citycode
+) b on a.citycode = b.citycode""")

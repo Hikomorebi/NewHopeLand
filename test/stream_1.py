@@ -58,7 +58,7 @@ def post_chat(query):
     except Exception as e:
         print("Exception occurred:", str(e))
 
-post_chat("当月认购缺口是多少？")
+post_chat("与去年国庆相差多少")
 #post_chat("当月的新增认购套数和金额是多少？")
 #post_chat("其中西部公司是多少")
 #post_chat("其中认购套数最高的三个项目")
