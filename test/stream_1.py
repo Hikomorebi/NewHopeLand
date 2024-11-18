@@ -6,7 +6,7 @@ import time
 
 def post_chat(query):
     # 接口地址
-    url = "http://me.ilisa.team:45109/chat"
+    url = "http://me.ilisa.team:45108/chat"
     headers = {"Content-Type": "application/json"}
     #data = {"session_id":"2","query": query,"dataSource":'{"fdc_dws":["dws_proj_room_totalsale_a_min"]}'}
     data = {"session_id":"3","query": query,"dataSource":''}
@@ -58,5 +58,19 @@ def post_chat(query):
     except Exception as e:
         print("Exception occurred:", str(e))
 
+#post_chat("当月的新增认购套数和金额是多少？")
+#post_chat("其中西部公司是多少")
+#post_chat("其中认购套数最高的三个项目")
+#post_chat("返回当月的认购缺口")
 
-post_chat("查询2022年6月份的认签比是多少？")
+#post_chat("2022年6月份的认签比是多少")
+#post_chat("其中认签比最差的项目有那些")
+#post_chat("6月成都锦官天宸项目的认签达成进度是多少")
+
+#post_chat("2024年9月份的签约完成率是多少？")
+#post_chat("其中温州立体城的是多少？")
+#post_chat("该月温州立体城的预估签约完成率是多少？")
+
+#post_chat("2024年国庆期间的新增认购套数、面积和金额有多少？")
+#post_chat("查询与去年国庆期间新增认购套数相差多少？")
+#post_chat("成都锦粼湖院2024年国庆与去年国庆相比，新增认购套数相差多少")

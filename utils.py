@@ -533,6 +533,7 @@ def dws_connect(sql_query,key_fields=None,display_type="response_bar_chart"):
                 )
                 dws_connect_dict["sql_results"] = sql_results
             translated_column_names = get_translate_column_names(column_names)
+            dws_connect_dict["translated"] = translated_column_names
             sql_results_json = get_sql_results_json(translated_column_names, type_codes, results, sql_query, results_length, positions, display_type)
             dws_connect_dict["status"] = 1
             dws_connect_dict["sql_results_json"] = sql_results_json
@@ -718,4 +719,4 @@ def dict_intersection(dict1, dict2):
 if __name__ == "__main__":
 
     #dws_connect_test("select subtosign_period/newvisittosub_num as subtosignavgcycle,subtosign_num as subtosignunits from fdc_ads.ads_salesreport_subscranalyse_a_min where statdate = current_date")
-    dws_connect("""select p.projcode, p.projname, p.m6plansignamount as 六月任务, sum(t.taxAmount) as 新增认购金额, case when p.m6plansignamount > 0 then sum(t.taxAmount) / p.m6plansignamount else null end as 六月认签比 from fdc_dws.dws_proj_projplansum_a_h p left join fdc_dwd.dwd_trade_roomsubscr_a_min t on p.projcode = t.projcode and t.partitiondate = current_date and t.subscrexecdate between '2022-06-01' and '2022-06-30' and t.closeDate > '2022-06-30' where p.partitiondate = current_date and p.years = '2022' and p.projname = '成都锦官天宸' group by p.projcode, p.projname, p.m6plansignamount;""")
+    dws_connect("""select memo1 对比项目 ,abandon_reason 未成交抗性 ,notbuyreason 未成交抗性 ,memo 大模型识别出对比项目未成交抗性 from fdc_ods.ods_qw_market_dh_crm_saleruser where partitiondate =current_date-1 Limit 5;""")

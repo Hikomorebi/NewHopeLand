@@ -111,7 +111,10 @@ class MateGen:
         # status:0表示大模型调用失败，1表示无需生成SQL语句，2表示生成SQL错误，3表示成功生成SQL语句
         chat_dict = {"time":"\n"}
         if question is not None:
-            user_message = {"role": "user", "content": question}
+            if process_user_input_dict['status'] == 3:
+                user_message = {"role": "user", "content": process_user_input_dict['user_question']}
+            else:
+                user_message = {"role": "user", "content": question}
             self.messages.messages_append(user_message)
             before_get_sql = time.time()
             if process_user_input_dict["status"] == 1:
@@ -202,13 +205,21 @@ class MateGen:
                     示例：
                     问题：请列出2024年8月提交的所有订单。
                     回答：这里展示了2024年8月提交的所有订单。
+
                     问题：查询南京天悦锦麟项目的所有客户名称和合同金额。
                     回答：以下内容展示了南京天悦锦麟项目中所有客户的名称和合同金额。""",
                 }
             else:
+                
                 second_message = {
                     "role": "user",
-                    "content": f"为了回答这个问题，生成SQL代码： {sql_code} 查询数据库，SQL查询返回结果为 {sql_exec_dict['sql_results']} ，请根据返回结果回答问题，请生成总结式的概括，尽可能简洁，你可以假装用户已经获取需要的数据，而不要在回答中直接展示数据。",
+                    "content": f"""
+                    为了回答这个问题，生成SQL代码，SQL查询返回结果的列名为：{sql_exec_dict['translated']}，每行内容为 {sql_exec_dict['sql_results']} ，请根据返回结果回答问题，请生成总结式的概括，尽可能简洁，你可以假装用户已经获取需要的数据，而不要在回答中直接展示数据。当用户未指定输出格式时，按下面的默认规范显示：
+                    金额：单位为万元，按千分位展示，比如 19,341 万元。
+                    套数：单位为套，按千分位展示，比如 12,247 套。
+                    面积：单位为平方米，按千分位展示，比如 1325 平方米。
+                    百分比：单位为%，按千分位展示，比如 41%。
+                    """,
                 }
             copy_messages.delete_system_messages_temp()
             copy_messages.messages_append(second_message)
