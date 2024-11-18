@@ -719,4 +719,4 @@ def dict_intersection(dict1, dict2):
 if __name__ == "__main__":
 
     #dws_connect_test("select subtosign_period/newvisittosub_num as subtosignavgcycle,subtosign_num as subtosignunits from fdc_ads.ads_salesreport_subscranalyse_a_min where statdate = current_date")
-    dws_connect("""select memo1 对比项目 ,abandon_reason 未成交抗性 ,notbuyreason 未成交抗性 ,memo 大模型识别出对比项目未成交抗性 from fdc_ods.ods_qw_market_dh_crm_saleruser where partitiondate =current_date-1 Limit 5;""")
+    dws_connect("""select nvl(a.plansignamount, 0) - nvl(b.subscramount, 0) as 认购缺口, a.plansignamount as 月度签约任务, b.subscramount as 月度新增认购金额 from (select sum(m11PlanSignAmount) plansignamount from fdc_dws.dws_proj_projplansum_a_h where partitiondate = current_date and years = 2024) a, (select sum(subscramount) as subscramount from fdc_dwd.dwd_trade_roomsubscr_a_min where partitiondate = current_date and subscrexecdate between '2024-11-01' and '2024-11-30' and (subscrstatus = '激活' or closereason = '转签约')) b;""")

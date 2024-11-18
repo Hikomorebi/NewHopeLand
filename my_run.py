@@ -59,7 +59,7 @@ system_prompt_indicator_template = """
 {indicator_rule};
 你是一名数据库专家，请根据计算规则生成正确的PostgreSQL语句。要求如下：
 1. 请仔细阅读并理解用户的请求。参考数据库字典提供的表结构和各字段信息，根据计算规则生成正确的PostgreSQL语句。
-2. 请完全按照提供的计算规则模板来设计SQL语句，不要修改计算规则的结构，同时如果计算规则中带有'$'符合作为占位符，需要从用户问题中提取相关的时间等信息来填充占位符。请确保所有占位符都被具体的值填充。
+2. 请完全按照提供的计算规则模板来设计SQL语句，不要修改计算规则的结构，同时如果计算规则中带有'$'符号作为占位符，需要从用户问题中提取相关的时间等信息来填充占位符。请确保所有占位符都被具体的值填充。
 3. 请确保所有字段和条件都使用具体的值。禁止随意假设不存在的信息。请务必确保生成的SQL语句能够直接运行。
 4. 如果数据字典中存在 partitiondate 字段，请在生成SQL语句的筛选条件中加入 partitiondate = current_date 。如果计算规则中存在 partitiondate 字段，则将该字段值筛选条件设为 current_date 。
 5. 如果用户请求的是一段时间内的数据，请确保SQL语句能够正确提取这段时间内的数据。如询问当日的数据，可以使用 current_date 作为筛选条件。如果问题涉及到当月或本月，请按照当前月份2024年11月份进行计算。
@@ -98,7 +98,7 @@ group by
     p.projcode, p.projname, p.${month}PlanSignAmount;
 你是一名数据库专家，请根据计算规则生成正确的PostgreSQL语句。要求如下：
 1. 请仔细阅读并理解用户的请求。参考数据库字典提供的表结构和各字段信息，根据计算规则生成正确的PostgreSQL语句。
-2. 请完全按照提供的计算规则模板来设计SQL语句，不要修改计算规则的结构，同时如果计算规则中带有'$'符合作为占位符，需要从用户问题中提取相关的时间等信息来填充占位符。请确保所有占位符都被具体的值填充。
+2. 请完全按照提供的计算规则模板来设计SQL语句，不要修改计算规则的结构，同时如果计算规则中带有'$'符号作为占位符，需要从用户问题中提取相关的时间等信息来填充占位符。请确保所有占位符都被具体的值填充。
 3. 请确保所有字段和条件都使用具体的值。禁止随意假设不存在的信息。请务必确保生成的SQL语句能够直接运行。
 4. 如果未指定具体月份，请按照当前月份2024年11月份进行计算。
 请严格按照计算规则的逻辑给出SQL代码，并按照以下JSON格式响应：
@@ -151,7 +151,7 @@ group by
     p.${month}PlanSignAmount;
 你是一名数据库专家，请根据计算规则生成正确的PostgreSQL语句。要求如下：
 1. 请仔细阅读并理解用户的请求。参考数据库字典提供的表结构和各字段信息，根据计算规则生成正确的PostgreSQL语句。
-2. 请完全按照提供的计算规则模板来设计SQL语句，不要修改计算规则的结构，同时如果计算规则中带有'$'符合作为占位符，需要从用户问题中提取相关的时间等信息来填充占位符。请确保所有占位符都被具体的值填充。
+2. 请完全按照提供的计算规则模板来设计SQL语句，不要修改计算规则的结构，同时如果计算规则中带有'$'符号作为占位符，需要从用户问题中提取相关的时间等信息来填充占位符。请确保所有占位符都被具体的值填充。
 3. 请确保所有字段和条件都使用具体的值。禁止随意假设不存在的信息。请务必确保生成的SQL语句能够直接运行。
 4. 如果未指定具体月份，请按照当前月份2024年11月份进行计算。
 请严格按照计算规则的逻辑给出SQL代码，并按照以下JSON格式响应：
@@ -164,8 +164,41 @@ group by
 {
     "sql:"select p.projcode, p.projname, p.m1PlanSignAmount as 一月任务, sum(nvl(t.contrtotalprice, 0) + nvl(t.firstdecoraterenosum, 0) + (case when t.fitmentpriceiscontr = '0' then nvl(t.decoratetotalprice, 0) else 0 end)) as 新增签约金额, case when p.m1PlanSignAmount > 0 then sum(nvl(t.contrtotalprice, 0) + nvl(t.firstdecoraterenosum, 0) + (case when t.fitmentpriceiscontr = '0' then nvl(t.decoratetotalprice, 0) else 0 end)) / p.m1PlanSignAmount else null end as 一月签约完成率 from fdc_dws.dws_proj_projplansum_a_h p left join fdc_dwd.dwd_trade_roomsign_a_min t on p.projcode = t.projcode where p.partitiondate = current_date and t.partitiondate = current_date and t.signexecdate between '2024-01-01' and '2024-01-31' and t.closedate > '2024-01-31' and p.years = '2024' group by p.projcode, p.projname, p.m1PlanSignAmount;"
 }
-
 """
+system_prompt_gap = """
+认购缺口是一个需要计算的指标，默认按月份进行计算，其计算规则是
+select nvl(a.plansignamount, 0) - nvl(b.subscramount, 0) as 认购缺口
+,a.plansignamount as 月度签约任务
+,b.subscramount as 月度新增认购金额
+from (
+    select sum(${month}PlanSignAmount) plansignamount
+    from fdc_dws.dws_proj_projplansum_a_h where partitiondate = current_date
+    and years = '${year}'
+) a,
+(
+    select sum(subscramount) as subscramount
+    from fdc_dwd.dwd_trade_roomsubscr_a_min 
+    where partitiondate = current_date 
+    and subscrexecdate '${startdate}' and '${enddate}' and (subscrstatus = '激活' or closereason = '转签约')
+) b;
+你是一名数据库专家，请根据计算规则生成正确的PostgreSQL语句。要求如下：
+1. 请仔细阅读并理解用户的请求。参考数据库字典提供的表结构和各字段信息，根据计算规则生成正确的PostgreSQL语句。
+2. 请完全按照提供的计算规则模板来设计SQL语句，不要修改计算规则的结构，计算规则中带有'$'符号作为占位符，需要从用户问题中提取相关的时间等信息来填充占位符。请确保所有占位符都被具体的值填充。
+3. 请确保所有字段和条件都使用具体的值。禁止随意假设不存在的信息。请务必确保生成的SQL语句能够直接运行。
+4. 如果未指定具体月份，请按照当前月份2024年11月份进行计算。
+请严格按照计算规则的逻辑给出SQL代码，并按照以下JSON格式响应：
+{
+    "sql": "SQL Query to run",
+}
+要求只返回最终的json对象，不要包含其余内容。
+示例：
+问题：返回当月认购缺口。
+回答：
+{
+    "sql:"select nvl(a.plansignamount, 0) - nvl(b.subscramount, 0) as 认购缺口, a.plansignamount as 月度签约任务, b.subscramount as 月度新增认购金额 from (select sum(m11PlanSignAmount) plansignamount from fdc_dws.dws_proj_projplansum_a_h where partitiondate = current_date and years = 2024) a, (select sum(subscramount) as subscramount from fdc_dwd.dwd_trade_roomsubscr_a_min where partitiondate = current_date and subscrexecdate between '2024-11-01' and '2024-11-30' and (subscrstatus = '激活' or closereason = '转签约')) b;"
+}
+"""
+
 mategen_dict = {}
 all_tables = {
     "fdc_ads": [
@@ -264,9 +297,7 @@ def chat():
                 print(
                     f"识别到指标问数，匹配到指标：{process_user_input_dict['indicator_name']}"
                 )
-                if process_user_input_dict["indicator_name"] == "认签比":
-                    chosen_tables = {"fdc_dwd":["dwd_trade_roomsubscr_a_min"],"fdc_dws":["dws_proj_projplansum_a_h"]}
-                elif process_user_input_dict["indicator_name"] == "签约完成率":
+                if process_user_input_dict["indicator_name"] in ["认签比","签约完成率","认购缺口"]:
                     chosen_tables = {"fdc_dwd":["dwd_trade_roomsubscr_a_min"],"fdc_dws":["dws_proj_projplansum_a_h"]}
                 else:
                     chosen_tables = select_table_based_on_indicator(
@@ -298,6 +329,13 @@ def chat():
                         base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
                         model="qwen-plus",
                         system_content_list=[system_prompt_signrate],
+                    )
+                elif indicator_name == "认购缺口":
+                    mategen = MateGen(
+                        api_key=os.getenv("OPENAI_API_KEY"),
+                        base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+                        model="qwen-plus",
+                        system_content_list=[system_prompt_gap],
                     )
                 else:
                     system_prompt_indicator = system_prompt_indicator_template.format(
