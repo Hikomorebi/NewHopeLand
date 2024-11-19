@@ -1,0 +1,42 @@
+签约达成率是一个需要计算的指标，其计算规则是
+select cm_signamount/nullif(cm_plansignamount, 0) as ${month_zh}月签约达成率
+,cm_signamount as ${month_zh}月签约金额
+,cm_plansignamount as ${month_zh}月计划签约金额
+,cq_signamount/nullif(cq_plansignamount, 0) as ${quarter_zh}季度签约达成率
+,cy_signamount/nullif(cy_plansignamount, 0) as ${year_zh}年签约达成率
+from
+(
+    select sum(${month}PlanSignAmount) as cm_plansignamount
+    ,sum(${quarter}PlanSignAmount) as cq_plansignamount
+    ,sum(yearPlanSignAmount) as cy_plansignamount
+    from fdc_dws.dws_proj_projplansum_a_h where partitiondate = current_date
+    and years = '${year}'
+) a
+,(
+    select sum(case when signdate between  date_trunc('month', DATE '${startdate}') and DATE '${enddate}' then contrTotalprice else null end) as cm_signamount
+    ,sum(case when signdate between date_trunc('quarter', DATE '${startdate}') and DATE '${enddate}' then contrTotalprice else null end) as cq_signamount
+    ,sum(case when signdate between date_trunc('year', DATE '${startdate}') and DATE '${enddate}' then contrTotalprice else null end) as cy_signamount
+    from
+    (
+        select signexecdate as signdate, nvl(contrtotalprice, 0) + nvl(firstdecoraterenosum, 0) + (case when fitmentpriceiscontr = '0' then nvl(decoratetotalprice, 0) else 0 end) as contrtotalprice
+        from fdc_dwd.dwd_trade_roomsign_a_min
+        where partitiondate = current_date
+        and closedate > '${enddate}'
+    ) 
+);
+其中模板变量 ${month} ， ${quarter} 和 ${year} 被用来动态生成查询条件，如果当前月份是1月，则 ${month} 会被替换为 m1，生成字段名 m1PlanSignAmount。如果当前季度是第一季度，则 ${quarter} 会被替换为 q1，生成字段名 q1PlanSignAmount。如果当前是2024年，则 ${year} 会被替换为 2024。${month_zh} ， ${quarter_zh} 和 ${year_zh}为月份、季度、年份的中文表示。
+你是一名数据库专家，请根据计算规则生成正确的PostgreSQL语句。要求如下：
+1. 请仔细阅读并理解用户的请求。参考数据库字典提供的表结构和各字段信息，根据计算规则生成正确的PostgreSQL语句。
+2. 请完全按照提供的计算规则模板来设计SQL语句，不要修改计算规则的结构，计算规则中带有'$'符号作为占位符，你需要从用户问题中提取相关的时间等信息来填充占位符。请确保所有占位符都被具体的值填充。
+3. 请确保所有字段和条件都使用具体的值。禁止随意假设不存在的信息。请务必确保生成的SQL语句能够直接运行。
+4. 如果未指定具体月份，请按照当前月份2024年11月份进行计算。
+请严格按照计算规则的逻辑给出SQL代码，并按照以下JSON格式响应：
+{
+    "sql": "SQL Query to run",
+}
+要求只返回最终的json对象，不要包含其余内容。
+示例：查询2024年一月份的签约达成率。
+回答：
+{
+    "sql:"SELECT cm_signamount / NULLIF(cm_plansignamount, 0) AS 一月签约达成率, cm_signamount AS 一月签约金额, cm_plansignamount AS 一月计划签约金额, cq_signamount / NULLIF(cq_plansignamount, 0) AS 一季度签约达成率, cy_signamount / NULLIF(cy_plansignamount, 0) AS 二零二四年签约达成率 FROM (SELECT SUM(m1PlanSignAmount) AS cm_plansignamount, SUM(q1PlanSignAmount) AS cq_plansignamount, SUM(yearPlanSignAmount) AS cy_plansignamount FROM fdc_dws.dws_proj_projplansum_a_h WHERE partitiondate = CURRENT_DATE AND years = '2024') a, (SELECT SUM(CASE WHEN signdate BETWEEN DATE_TRUNC('month', DATE '2024-01-01') AND DATE '2024-01-31' THEN contrTotalprice ELSE NULL END) AS cm_signamount, SUM(CASE WHEN signdate BETWEEN DATE_TRUNC('quarter', DATE '2024-01-01') AND DATE '2024-01-31' THEN contrTotalprice ELSE NULL END) AS cq_signamount, SUM(CASE WHEN signdate BETWEEN DATE_TRUNC('year', DATE '2024-01-01') AND DATE '2024-01-31' THEN contrTotalprice ELSE NULL END) AS cy_signamount FROM (SELECT signexecdate AS signdate, NVL(contrtotalprice, 0) + NVL(firstdecoraterenosum, 0) + (CASE WHEN fitmentpriceiscontr = '0' THEN NVL(decoratetotalprice, 0) ELSE 0 END) AS contrtotalprice FROM fdc_dwd.dwd_trade_roomsign_a_min WHERE partitiondate = CURRENT_DATE AND closedate > '2024-01-31')) b;"
+}

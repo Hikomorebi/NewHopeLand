@@ -58,9 +58,9 @@ def post_chat(query):
     except Exception as e:
         print("Exception occurred:", str(e))
 
-#post_chat("列出每个公司的认签比")
+post_chat("认签比完成最差的项目有哪些？")
 #post_chat("认签比完成最差的项目有哪些")
-post_chat("查询当月签约达成率")
+#post_chat("查询当月签约达成率")
 #post_chat("当月的新增认购套数和金额是多少？")
 #post_chat("其中西部公司是多少")
 #post_chat("其中认购套数最高的三个项目")

@@ -348,7 +348,7 @@ def get_indicator_names(cursor):
     indicator_names = [row[0] for row in result if row[0] is not None]
     return indicator_names
 def get_indicator_data(cursor,indicator_name):
-    query = "SELECT NAME,FIELD_NAME,CALCULATION_RULES,DATA_TABLE_NAME FROM NH_INDICATOR_MANAGEMENT WHERE `NAME` = %s"
+    query = "SELECT NAME,FIELD_NAME,CALCULATION_RULES,DATA_SOURCE FROM NH_INDICATOR_MANAGEMENT WHERE `NAME` = %s"
     cursor.execute(query, (indicator_name,))
     result = cursor.fetchone()
     if result:
@@ -734,4 +734,4 @@ def dict_intersection(dict1, dict2):
 if __name__ == "__main__":
 
     #dws_connect_test("select subtosign_period/newvisittosub_num as subtosignavgcycle,subtosign_num as subtosignunits from fdc_ads.ads_salesreport_subscranalyse_a_min where statdate = current_date")
-    dws_connect("""SELECT cm_signamount/NULLIF(cm_plansignamount, 0) AS 十一月签约达成率, cm_signamount AS 十一月签约金额, cm_plansignamount AS 十一月计划签约金额, cq_signamount / NULLIF(cq_plansignamount, 0) AS 四季度签约达成率, cy_signamount / NULLIF(cy_plansignamount, 0) AS 二四年签约达成率 FROM (SELECT SUM(m11PlanSignAmount) AS cm_plansignamount, SUM(q4PlanSignAmount) AS cq_plansignamount, SUM(yearPlanSignAmount) AS cy_plansignamount FROM fdc_dws.dws_proj_projplansum_a_h WHERE partitiondate = CURRENT_DATE AND years = '2024') a, (SELECT SUM(CASE WHEN signdate BETWEEN DATE_TRUNC('month', DATE '2024-11-01') AND DATE '2024-11-30' THEN contrTotalprice ELSE NULL END) AS cm_signamount, SUM(CASE WHEN signdate BETWEEN DATE_TRUNC('quarter', DATE '2024-11-01') AND DATE '2024-11-30' THEN contrTotalprice ELSE NULL END) AS cq_signamount, SUM(CASE WHEN signdate BETWEEN DATE_TRUNC('year', DATE '2024-11-01') AND DATE '2024-11-30' THEN contrTotalprice ELSE NULL END) AS cy_signamount FROM (SELECT signexecdate AS signdate, NVL(contrtotalprice, 0) + NVL(firstdecoraterenosum, 0) + (CASE WHEN fitmentpriceiscontr = '0' THEN NVL(decoratetotalprice, 0) ELSE 0 END) AS contrtotalprice FROM fdc_dwd.dwd_trade_roomsign_a_min WHERE partitiondate = CURRENT_DATE AND closedate > '2024-11-30')) b;""")
+    dws_connect(""" """)
