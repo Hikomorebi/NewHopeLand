@@ -734,4 +734,4 @@ def dict_intersection(dict1, dict2):
 if __name__ == "__main__":
 
     #dws_connect_test("select subtosign_period/newvisittosub_num as subtosignavgcycle,subtosign_num as subtosignunits from fdc_ads.ads_salesreport_subscranalyse_a_min where statdate = current_date")
-    dws_connect("""with visitflow as (select projcode, projname, saleruserid, isvisit as isrevisit, visitdate, min(visitdate) over(partition by saleruserid, isvisit) min_visitdate from fdc_dwd.dwd_cust_custvisitflow_a_min where partitiondate = current_date) select count(distinct case when isrevisit = '否' then saleruserid else null end) + count(distinct case when isrevisit = '是' then saleruserid else null end) as 来访组数 from visitflow a where (isrevisit = '是' or visitdate = min_visitdate) and left(visitdate, 10) between '2024-10-01' and '2024-10-07' and projname LIKE '%锦粼湖院%'; """)
+    dws_connect("""SELECT newvisittosub_period / newvisittosub_num AS visittosubavgcycle, newvisittosub_num AS visittosubunits FROM fdc_ads.ads_salesreport_subscranalyse_a_min WHERE statdate BETWEEN '2023-01-01' AND '2023-01-31' AND orgname LIKE '%宁波堇麟上府云汀%' AND orgtype = '西部区域公司'; """)
