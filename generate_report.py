@@ -534,23 +534,26 @@ def query_visitornum_info():
     finally:
         connection.close()
 
-# 从CSV文件中读取数据并建立销售人员ID和姓名的映射关系
+# 从CSV文件中读取数据并建立销售人员ID和姓名、项目名的映射关系
 def build_saler_map_from_csv(file_path):
-    saler_map = {}
+    saler_map1 = {}
+    saler_map2 = {}
     with open(file_path, mode='r', encoding='utf-8') as file:
         reader = csv.DictReader(file)
         for row in reader:
             saler_id = row['saler_id']
             saler_name = row['saler_name']
-            saler_map[saler_id] = saler_name
-    return saler_map
+            project_name = row['project_name']
+            saler_map1[saler_id] = saler_name
+            saler_map2[saler_id] = project_name
+    return saler_map1 , saler_map2
 
 # 生成 json 形式的报告
 def generate_json_report(customers):
 
     # 设置存储销售人员信息的csv文件的系统路径并构建映射关系
     role_csv_file_path = 'role.csv'
-    saler_map = build_saler_map_from_csv(role_csv_file_path)
+    saler_map1,saler_map2 = build_saler_map_from_csv(role_csv_file_path)
 
     visitornum = 0  # 来访客户总数
     newvisitornum = 0  # 新增来访客户数
@@ -567,8 +570,9 @@ def generate_json_report(customers):
 
     for customer in customers:
         visitornum += 1  # 来访客户数加1
-        # 从映射关系中获取销售人员姓名
-        saler_name = saler_map.get(customer.get('saleropenid', '未知'), '未知')
+        # 从映射关系中获取销售人员姓名+项目名字
+        saler_name = saler_map1.get(customer.get('saleropenid', '未知'), '未知')
+        project_name = saler_map2.get(customer.get('saleropenid','未知'),'未知')
         # 从来访次数字段判断是新访、复访
         # 确保 visitamount 是整数类型
         visitamount = int(customer.get('visitamount', 0))
@@ -600,6 +604,7 @@ def generate_json_report(customers):
                 customer_report = {
                     "序号": customer.get('id','未知'),
                     "日期":customer.get('createtime','未知'),
+                    "项目名称":project_name,
                     "置业顾问ID": customer.get('saleropenid', '未知'),
                     "置业顾问姓名":saler_name,
                     "客户姓名": customer.get('username', '未知'),  
@@ -632,6 +637,7 @@ def generate_json_report(customers):
                 customer_report = {
                     "序号": customer.get('id','未知'),
                     "日期":customer.get('createtime','未知'),
+                    "项目名称":project_name,
                     "置业顾问ID": customer.get('saleropenid', '未知'),
                     "置业顾问姓名":saler_name,
                     "客户姓名": customer.get('username', '未知'),  
@@ -675,6 +681,7 @@ def generate_json_report(customers):
                 customer_report = {
                     "序号": customer.get('id','未知'),
                     "日期":customer.get('createtime','未知'),
+                    "项目名称":project_name,
                     "置业顾问ID": customer.get('saleropenid', '未知'),
                     "置业顾问姓名":saler_name,
                     "客户姓名": customer.get('username', '未知'),  
