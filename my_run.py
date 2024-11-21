@@ -6,7 +6,7 @@ import time
 import traceback
 from MateGen import MateGen
 import json
-# from generate_report import generate_json_report, query_customer_info
+from generate_report import generate_json_report, query_customer_info
 from utils import (
     default_converter,
     query_tables_description,
@@ -372,24 +372,23 @@ def analysis():
         else:
             customer_data = query_customer_info(saleropenid,start_date,end_date)
 
-#         if not customer_data:
-#             return jsonify({"status": "error", "response": "未查询到相关客户信息。"})
+        if not customer_data:
+            return jsonify({"status": "error", "response": "未查询到相关客户信息。"})
 
         json_report = generate_json_report(customer_data,projectId,projectName)
 
-#         report_filename = f"高意向客户分析报告_{saleropenid}.json"
-#         with open(report_filename, "w", encoding="utf-8") as file:
-#             # 美化输出JSON
-#             json.dump(json_report, file, ensure_ascii=False, indent=4)
+        report_filename = f"高意向客户分析报告_{saleropenid}.json"
+        with open(report_filename, "w", encoding="utf-8") as file:
+            # 美化输出JSON
+            json.dump(json_report, file, ensure_ascii=False, indent=4)
 
-#         print(f"报告已生成并保存在 {report_filename}")
+        print(f"报告已生成并保存在 {report_filename}")
 
-#         return jsonify({"status": "success", "response": json_report})
+        return jsonify({"status": "success", "response": json_report})
 
-#     except Exception as e:
-#         traceback.print_exc()
-#         return jsonify({"status": "error", "response": str(e)})
-
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"status": "error", "response": str(e)})
 
 if __name__ == "__main__":
     app.run(threaded=True, host="0.0.0.0", port=45108)

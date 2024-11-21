@@ -6,7 +6,7 @@ import time
 import traceback
 from MateGen import MateGen
 import json
-# from generate_report import generate_json_report, query_customer_info
+from generate_report import generate_json_report, query_customer_info
 from utils import (
     default_converter,
     query_tables_description,
@@ -339,54 +339,56 @@ def chat():
         return jsonify({"status": "error", "response": str(e)})
 
 
-# @app.route("/analysis", methods=["POST"])
-# def analysis():
-#     try:
-#         data = request.json
-#         saleropenid = data.get("saler_id")
-#         role_name = data.get("role_name")
-#         if not all([saleropenid, role_name]):
-#             return jsonify(
-#                 {
-#                     "status": "error",
-#                     "response": "缺少必要的参数: saler_id 或 role_name",
-#                 }
-#             )
+@app.route("/analysis", methods=["POST"])
+def analysis():
+    try:
+        data = request.json
+        # 获取传递的参数
+        saleropenid = data.get("saleropenid")
+        subordinateId = data.get("subordinateId")
+        projectId = data.get("projectId")
+        projectName = data.get("projectName")
+        start_date = data.get("start_date")
+        end_date = data.get("end_date")
 
-#         # 读取当天的销售人员信息
-#         # 后续可能要改成数据库的读取形式
-#         role_data = read_csv_data("role.csv")
+        if not all([saleropenid,projectId,projectName,start_date,end_date]):
+            return jsonify({
+                "status": "error",
+                "response": "缺少必要的参数",
+            })
+        
+        # 如果是销售主管，查询所有下属的置业顾问的顾客信息
+        if subordinateId:
+            # 将subordinateId字符串分割成列表
+            subordinate_ids = subordinateId.split(",")
+            customer_data = []
+            # 遍历每个sub_id
+            for sub_id in subordinate_ids:
+                # 确保sub_id不为空
+                if sub_id:
+                    customers = query_customer_info(sub_id.strip(),start_date,end_date)  
+                    customer_data.extend(customers)
+        # 如果是置业顾问，只查询自己的顾客信息        
+        else:
+            customer_data = query_customer_info(saleropenid,start_date,end_date)
 
-#         # 如果是销售主管，查询所有下属的置业顾问的顾客信息
-#         if role_name == "销售主管":
-#             project_ids = get_project_ids_for_sales_manager(saleropenid, role_data)
-#             subordinate_ids = query_subordinates(project_ids, role_data)
-#             customer_data = []
-#             for sub_id in subordinate_ids:
-#                 customers = query_customer_info(sub_id)
-#                 customer_data.extend(customers)
-#         # 如果是置业顾问，只查询自己的顾客信息
-#         else:
-#             customer_data = query_customer_info(saleropenid)
+        if not customer_data:
+            return jsonify({"status": "error", "response": "未查询到相关客户信息。"})
 
-#         if not customer_data:
-#             return jsonify({"status": "error", "response": "未查询到相关客户信息。"})
+        json_report = generate_json_report(customer_data,projectId,projectName)
 
-#         json_report = generate_json_report(customer_data)
+        report_filename = f"高意向客户分析报告_{saleropenid}.json"
+        with open(report_filename, "w", encoding="utf-8") as file:
+            # 美化输出JSON
+            json.dump(json_report, file, ensure_ascii=False, indent=4)
 
-#         report_filename = f"高意向客户分析报告_{saleropenid}.json"
-#         with open(report_filename, "w", encoding="utf-8") as file:
-#             # 美化输出JSON
-#             json.dump(json_report, file, ensure_ascii=False, indent=4)
+        print(f"报告已生成并保存在 {report_filename}")
 
-#         print(f"报告已生成并保存在 {report_filename}")
+        return jsonify({"status": "success", "response": json_report})
 
-#         return jsonify({"status": "success", "response": json_report})
-
-#     except Exception as e:
-#         traceback.print_exc()
-#         return jsonify({"status": "error", "response": str(e)})
-
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"status": "error", "response": str(e)})
 
 if __name__ == "__main__":
     app.run(threaded=True, host="0.0.0.0", port=45108)
