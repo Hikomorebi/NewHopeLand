@@ -295,34 +295,39 @@ def chat():
 def analysis():
     try:
         data = request.json
-        saleropenid = data.get("saler_id")
-        role_name = data.get("role_name")
-        if not all([saleropenid, role_name]):
+        # 获取传递的参数
+        saleropenid = data.get("saleropenid")
+        subordinateId = data.get("subordinateId")
+        projectId = data.get("projectId")
+        projectName = data.get("projectName")
+        start_date = data.get("start_date")
+        end_date = data.get("end_date")
+
+        if not all([saleropenid,projectId,projectName,start_date,end_date]):
             return jsonify({
                 "status": "error",
-                "response": "缺少必要的参数: saler_id 或 role_name",
+                "response": "缺少必要的参数",
             })
         
-        # 读取当天的销售人员信息
-        # 后续可能要改成数据库的读取形式
-        role_data = read_csv_data('role.csv')  
-        
         # 如果是销售主管，查询所有下属的置业顾问的顾客信息
-        if role_name == "销售主管":
-            project_ids = get_project_ids_for_sales_manager(saleropenid, role_data)
-            subordinate_ids = query_subordinates(project_ids, role_data)
+        if subordinateId:
+            # 将subordinateId字符串分割成列表
+            subordinate_ids = subordinateId.split(",")
             customer_data = []
+            # 遍历每个sub_id
             for sub_id in subordinate_ids:
-                customers = query_customer_info(sub_id)
-                customer_data.extend(customers)
+                # 确保sub_id不为空
+                if sub_id:
+                    customers = query_customer_info(sub_id.strip(),start_date,end_date)  
+                    customer_data.extend(customers)
         # 如果是置业顾问，只查询自己的顾客信息        
         else:
-            customer_data = query_customer_info(saleropenid)
+            customer_data = query_customer_info(saleropenid,start_date,end_date)
 
         if not customer_data:
             return jsonify({"status": "error", "response": "未查询到相关客户信息。"})
 
-        json_report = generate_json_report(customer_data)
+        json_report = generate_json_report(customer_data,projectId,projectName)
 
         report_filename = f"高意向客户分析报告_{saleropenid}.json"
         with open(report_filename, "w", encoding="utf-8") as file:
