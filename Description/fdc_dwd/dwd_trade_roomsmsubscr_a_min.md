@@ -3,7 +3,7 @@ fdc_dwd.dwd_trade_roomsmsubscr_a_min
 
 - 数据表解释
 
-房间小订信息表。查询该数据表时，请务必使用 partitiondate 筛选分区时期，若无特别说明，使用 partitiondate = current_date进行筛选。
+房间小订信息表。查询该数据表时，请务必使用 partitiondate 筛选分区时期，若无特别说明，使用 partitiondate = current_date进行筛选。其中 cityname 代表城市公司或者区域公司的名称，如西部区域公司，华东公司，武汉公司等。
 
 - 各字段说明
 

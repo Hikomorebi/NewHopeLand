@@ -6,7 +6,7 @@ import time
 import traceback
 from MateGen import MateGen
 import json
-from generate_report import generate_markdown_report, query_customer_info
+# from generate_report import generate_json_report, query_customer_info
 from utils import (
     default_converter,
     query_tables_description,
@@ -14,8 +14,11 @@ from utils import (
     get_session_messages,
     test_match,
     dict_intersection,
+    #read_csv_data,
+    #get_project_ids_for_sales_manager,
+    #query_subordinates,
     process_user_input,
-    select_table_based_on_indicator
+    select_table_based_on_indicator,
 )
 from auto_select_tables import select_table_based_on_query
 
@@ -34,7 +37,8 @@ system_prompt_common = """
 6. 如果用户请求的是一段时间内的数据，请确保SQL语句能够正确提取这段时间内的数据。如询问当日的数据，可以使用 current_date 作为筛选条件。如果问题涉及到今年或者本月，请自动理解为当前时间为2024年11月。
 7. 生成的SQL语句不能涵盖非法字符如"\n"。
 8. 生成的SQL语句选择的字段分为核心字段和相关字段，核心字段是与用户需求连接最紧密的字段，相关字段是与用户需求相关的其他字段，用于确保信息的完整性。请将核心字段放入返回要求格式的 key_fields 参数值中。
-9. 请从如下给出的展示方式种选择最优的一种用以进行数据渲染，将类型名称放入返回要求格式的 display_type 参数值中，可用数据展示方式如下:
+9. 若用户提问中涉及项目名称，请提取项目名称作为模糊匹配的筛选条件。项目名称可能包含城市名，应视为一个完整的字符串，不要拆分。如"成都皇冠湖壹号","温州立体城"可以通过"%皇冠湖壹号%"和"%立体城%"进行模糊匹配。
+10. 请从如下给出的展示方式种选择最优的一种用以进行数据渲染，将类型名称放入返回要求格式的 display_type 参数值中，可用数据展示方式如下:
 {
     "response_line_chart": "用于显示对比趋势分析数据",
     "response_pie_chart": "适用于比例和分布统计场景",
@@ -56,17 +60,27 @@ system_prompt_indicator_template = """
 {indicator_rule};
 你是一名数据库专家，请根据计算规则生成正确的PostgreSQL语句。要求如下：
 1. 请仔细阅读并理解用户的请求。参考数据库字典提供的表结构和各字段信息，根据计算规则生成正确的PostgreSQL语句。
-2. 请完全按照提供的计算规则模板来设计SQL语句，不要修改计算规则的结构，同时如果计算规则中带有'$'符合作为占位符，需要从用户问题中提取相关的时间等信息来填充占位符。请确保所有占位符都被具体的值填充。
+2. 请完全按照提供的计算规则模板来设计SQL语句，不要修改计算规则的结构，同时如果计算规则中带有'$'符号作为占位符，需要从用户问题中提取相关的时间等信息来填充占位符。请确保所有占位符都被具体的值填充。
 3. 请确保所有字段和条件都使用具体的值。禁止随意假设不存在的信息。请务必确保生成的SQL语句能够直接运行。
 4. 如果数据字典中存在 partitiondate 字段，请在生成SQL语句的筛选条件中加入 partitiondate = current_date 。如果计算规则中存在 partitiondate 字段，则将该字段值筛选条件设为 current_date 。
 5. 如果用户请求的是一段时间内的数据，请确保SQL语句能够正确提取这段时间内的数据。如询问当日的数据，可以使用 current_date 作为筛选条件。
-6. 若用户提问中涉及项目名称，请提取项目名称作为筛选条件。项目名称可能包含城市名，应视为一个完整的字符串，不要拆分。如"成都皇冠湖壹号","温州立体城"才是完整的项目名称。
+6. 如果问题涉及到相对时间，如今年、当月，请按照当前时间为 2024 年 11 月份进行计算。
+7. 若用户提问中涉及项目名称，请提取项目名称作为模糊匹配的筛选条件。项目名称可能包含城市名，应视为一个完整的字符串，不要拆分。如"成都皇冠湖壹号","温州立体城"可以通过"%皇冠湖壹号%"和"%立体城%"进行模糊匹配。
 请严格按照计算规则的逻辑给出SQL代码，并按照以下JSON格式响应：
 {{
     "sql": "SQL Query to run",
 }}
 要求只返回最终的json对象，不要包含其余内容。
 """
+
+with open('SystemPrompts/subsignrate.txt', 'r', encoding='utf-8') as file:
+    system_prompt_subsignrate = file.read()
+with open('SystemPrompts/signrate.txt', 'r', encoding='utf-8') as file:
+    system_prompt_signrate = file.read()
+with open('SystemPrompts/subgap.txt', 'r', encoding='utf-8') as file:
+    system_prompt_subgap = file.read()
+with open('SystemPrompts/visitgroup.txt', 'r', encoding='utf-8') as file:
+    system_prompt_visitgroup = file.read()
 
 mategen_dict = {}
 all_tables = {
@@ -151,7 +165,7 @@ def chat():
                 # 捕获其他可能的错误
                 print(str(e))
                 chosen_tables = None
-        
+
             try:
                 available_tables = json.loads(data.get("availableTables"))
             except Exception as e:
@@ -162,9 +176,23 @@ def chat():
             # 根据session_id获取历史消息，查询华菁数据库nh_chat_history表中CONTENT字段，注意需要去除id的内容。若为空，则说明开启的是新会话，返回NULL
             session_messages = get_session_messages(current_session_id)
             # 根据session_id获取使用到的表，查询华菁数据库nh_chat_history表中DATA_SET_JSON字段获取
-            if process_user_input_dict["status"] == 2:
-                print(f"识别到指标问数，匹配到指标：{process_user_input_dict['indicator_name']}")
-                chosen_tables = select_table_based_on_indicator(process_user_input_dict["indicator_data"]["数据来源"])
+            is_1_indicator = False
+            if process_user_input_dict['status'] == 1 and process_user_input_dict["is_indicator"]:
+                is_1_indicator = True
+            if process_user_input_dict["status"] == 2 or is_1_indicator:
+                print(
+                    f"识别到指标问数，匹配到指标：{process_user_input_dict['indicator_name']}"
+                )
+                if process_user_input_dict["indicator_name"] in ["认签达成进度","认签比","认购缺口"]:
+                    chosen_tables = {"fdc_dwd":["dwd_trade_roomsubscr_a_min"],"fdc_dws":["dws_proj_projplansum_a_h"]}
+                elif process_user_input_dict["indicator_name"] in ["签约达成率","签约完成率"]:
+                    chosen_tables = {"fdc_dwd":["dwd_trade_roomsign_a_min"],"fdc_dws":["dws_proj_projplansum_a_h"]}
+                elif process_user_input_dict["indicator_name"] == "来访组数":
+                    chosen_tables = {"fdc_dwd":"dwd_cust_custvisitflow_a_min"}
+                else:
+                    chosen_tables = select_table_based_on_indicator(
+                        process_user_input_dict["indicator_data"]["数据来源"]
+                    )
                 print(f"选择的表是：{chosen_tables}")
             if chosen_tables is None:
                 chosen_tables = select_table_based_on_query(query)
@@ -174,22 +202,50 @@ def chat():
             # 根据used_tables拼接获得数据字典
             data_dictionary_md = query_tables_description(used_tables)
 
-            if process_user_input_dict["status"] == 2:
+            if process_user_input_dict["status"] == 2 or is_1_indicator:
                 indicator_data = process_user_input_dict["indicator_data"]
                 indicator_name = process_user_input_dict["indicator_name"]
-                system_prompt_indicator = system_prompt_indicator_template.format(
-                indicator_name=indicator_name,
-                indicator_field_name=indicator_data["指标字段名"],
-                indicator_rule=indicator_data["计算规则"],
-                )
-                mategen = MateGen(
-                    api_key=os.getenv("OPENAI_API_KEY"),
-                    base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
-                    model="qwen-plus",
-                    system_content_list=[
-                        system_prompt_indicator
-                    ],
-                )
+
+                if indicator_name == "认签比":
+                    mategen = MateGen(
+                        api_key=os.getenv("OPENAI_API_KEY"),
+                        base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+                        model="qwen-plus",
+                        system_content_list=[system_prompt_subsignrate],
+                    )
+                elif indicator_name == "签约完成率" or indicator_name == "签约达成率":
+                    mategen = MateGen(
+                        api_key=os.getenv("OPENAI_API_KEY"),
+                        base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+                        model="qwen-plus",
+                        system_content_list=[system_prompt_signrate],
+                    )
+                elif indicator_name == "认购缺口":
+                    mategen = MateGen(
+                        api_key=os.getenv("OPENAI_API_KEY"),
+                        base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+                        model="qwen-plus",
+                        system_content_list=[system_prompt_subgap],
+                    )
+                elif indicator_name == "来访组数":
+                    mategen = MateGen(
+                        api_key=os.getenv("OPENAI_API_KEY"),
+                        base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+                        model="qwen-plus",
+                        system_content_list=[system_prompt_visitgroup],
+                    )
+                else:
+                    system_prompt_indicator = system_prompt_indicator_template.format(
+                        indicator_name=indicator_name,
+                        indicator_field_name=indicator_data["指标字段名"],
+                        indicator_rule=indicator_data["计算规则"],
+                    )
+                    mategen = MateGen(
+                        api_key=os.getenv("OPENAI_API_KEY"),
+                        base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+                        model="qwen-plus",
+                        system_content_list=[system_prompt_indicator],
+                    )
             else:
                 few_shots = query_few_shots(used_tables)
 
@@ -214,22 +270,18 @@ def chat():
         elapsed_time = before_chat_time - start_time
 
         print("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
-        print(f"对话准备耗时: {elapsed_time:.4f} 秒")
+        print(f"第一阶段：对话准备（数据表选择）耗时: {elapsed_time:.4f} 秒")
 
-        chat_dict = mategen.chat(query,process_user_input_dict)
+        chat_dict = mategen.chat(query, process_user_input_dict)
 
-        chat_dict["time"]=f"\n对话准备耗时: {elapsed_time:.4f} 秒" + chat_dict["time"]
+        chat_dict["time"] = f"\n第一阶段：对话准备（数据表选择）耗时: {elapsed_time:.4f} 秒" + chat_dict["time"]
         if "chosen_tables" not in chat_dict:
             if is_new:
                 chat_dict["chosen_tables"] = chosen_tables
             else:
-                chat_dict["chosen_tables"] = {"error":"多轮对话不展示chosen_tables信息"}
-
-        after_chat_time = time.time()
-        elapsed_time_chat = after_chat_time - before_chat_time
-        print("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
-        print(f"执行chat函数耗时: {elapsed_time_chat:.4f} 秒")
-        chat_dict["time"]+=f"执行问数函数总耗时（约等于上面三个时间相加）: {elapsed_time_chat:.4f} 秒\n"
+                chat_dict["chosen_tables"] = {
+                    "error": "多轮对话不展示chosen_tables信息"
+                }
 
         def generate_012(chat_dict):
             if chat_dict["status"] == 0:
@@ -269,8 +321,8 @@ def chat():
             finish_info = {
                 "sql_code": chat_dict["sql_code"],
                 "sql_response": chat_dict["sql_results_json"],
-                "chosen_tables":chat_dict["chosen_tables"],
-                "time":chat_dict["time"]
+                "chosen_tables": chat_dict["chosen_tables"],
+                "time": chat_dict["time"],
             }
             yield json.dumps(finish_info, default=default_converter)
 
@@ -287,38 +339,53 @@ def chat():
         return jsonify({"status": "error", "response": str(e)})
 
 
-@app.route("/analysis", methods=["POST"])
-def analysis():
-    try:
-        data = request.json
+# @app.route("/analysis", methods=["POST"])
+# def analysis():
+#     try:
+#         data = request.json
+#         saleropenid = data.get("saler_id")
+#         role_name = data.get("role_name")
+#         if not all([saleropenid, role_name]):
+#             return jsonify(
+#                 {
+#                     "status": "error",
+#                     "response": "缺少必要的参数: saler_id 或 role_name",
+#                 }
+#             )
 
-        # {"saler_id":"xxx","role_name":"销售主管"}
-        # {"saler_id":"xxx","role_name":"置业顾问"}
-        saleropenid = data.get("saler_id")
-        # 日期用 current_date 作为筛选条件
-        start_date = data.get("start_date")
-        end_date = data.get("end_date")
+#         # 读取当天的销售人员信息
+#         # 后续可能要改成数据库的读取形式
+#         role_data = read_csv_data("role.csv")
 
-        if not all([saleropenid, start_date, end_date]):
-            return jsonify(
-                {
-                    "status": "error",
-                    "response": "缺少必要的参数：saleropenid, start_date 或 end_date",
-                }
-            )
+#         # 如果是销售主管，查询所有下属的置业顾问的顾客信息
+#         if role_name == "销售主管":
+#             project_ids = get_project_ids_for_sales_manager(saleropenid, role_data)
+#             subordinate_ids = query_subordinates(project_ids, role_data)
+#             customer_data = []
+#             for sub_id in subordinate_ids:
+#                 customers = query_customer_info(sub_id)
+#                 customer_data.extend(customers)
+#         # 如果是置业顾问，只查询自己的顾客信息
+#         else:
+#             customer_data = query_customer_info(saleropenid)
 
-        customers = query_customer_info(saleropenid, start_date, end_date)
-        if not customers:
-            print("未查询到相关客户信息。")
-            return jsonify({"status": "error", "response": "未查询到相关客户信息。"})
+#         if not customer_data:
+#             return jsonify({"status": "error", "response": "未查询到相关客户信息。"})
 
-        report = generate_markdown_report(customers, saleropenid)
+#         json_report = generate_json_report(customer_data)
 
-        return jsonify({"status": "success", "response": report})
+#         report_filename = f"高意向客户分析报告_{saleropenid}.json"
+#         with open(report_filename, "w", encoding="utf-8") as file:
+#             # 美化输出JSON
+#             json.dump(json_report, file, ensure_ascii=False, indent=4)
 
-    except Exception as e:
-        traceback.print_exc()
-        return jsonify({"status": "error", "response": str(e)})
+#         print(f"报告已生成并保存在 {report_filename}")
+
+#         return jsonify({"status": "success", "response": json_report})
+
+#     except Exception as e:
+#         traceback.print_exc()
+#         return jsonify({"status": "error", "response": str(e)})
 
 
 if __name__ == "__main__":

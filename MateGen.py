@@ -111,7 +111,10 @@ class MateGen:
         # status:0表示大模型调用失败，1表示无需生成SQL语句，2表示生成SQL错误，3表示成功生成SQL语句
         chat_dict = {"time":"\n"}
         if question is not None:
-            user_message = {"role": "user", "content": question}
+            if process_user_input_dict['status'] == 3:
+                user_message = {"role": "user", "content": process_user_input_dict['user_question']}
+            else:
+                user_message = {"role": "user", "content": question}
             self.messages.messages_append(user_message)
             before_get_sql = time.time()
             if process_user_input_dict["status"] == 1:
@@ -156,16 +159,16 @@ class MateGen:
             start_time_dws = time.time()
             elapsed_time_get_sql = start_time_dws - before_get_sql
             print("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
-            print(f"获取SQL语句耗时: {elapsed_time_get_sql:.4f} 秒")
-            chat_dict["time"]+=f"获取SQL语句耗时: {elapsed_time_get_sql:.4f} 秒\n"
+            print(f"第二阶段：获取SQL语句耗时: {elapsed_time_get_sql:.4f} 秒")
+            chat_dict["time"]+=f"第二阶段：获取SQL语句耗时: {elapsed_time_get_sql:.4f} 秒\n"
             # 执行SQL语句
             # status : 0表示sql执行报错,1表示正常返回结果，2表示查询结果为空
             sql_exec_dict = dws_connect(sql_code, key_fields, display_type)
             end_time_dws = time.time()
             elapsed_time_dws = end_time_dws - start_time_dws
             print("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
-            print(f"查询dws数据库并制作sql_response耗时: {elapsed_time_dws:.4f} 秒")
-            chat_dict["time"]+=f"查询dws数据库并制作sql_response耗时: {elapsed_time_dws:.4f} 秒\n"
+            print(f"第三阶段：查询dws数据库并制作sql_response耗时: {elapsed_time_dws:.4f} 秒")
+            chat_dict["time"]+=f"第三阶段：查询dws数据库并制作sql_response耗时: {elapsed_time_dws:.4f} 秒\n"
             
             if sql_exec_dict["status"] == 0:
                 chat_dict["status"] = 2
@@ -189,14 +192,35 @@ class MateGen:
                 return chat_dict
             copy_messages = copy.deepcopy(self.messages)
             if sql_exec_dict["is_long"]:
+                # second_message = {
+                #     "role": "user",
+                #     "content": "由于查询结果数据量较大，无法全部展示。但是用户已经得到所需的全部数据。根据问题请生成一段简要的描述性文字，用于配合用户得到的数据，描述查询结果的概况。例如问题：请列出2024年8月提交的所有订单。你的回答：这里展示了2024年8月提交的所有订单。尽量简洁，只需要简短一句话即可。",
+                # }
                 second_message = {
                     "role": "user",
-                    "content": "由于查询结果数据量较大，无法全部展示。但是用户已经得到所需的全部数据。根据问题请生成一段简要的描述性文字，用于配合用户得到的数据，描述查询结果的概况。例如问题：请列出2024年8月提交的所有订单。你的回答：这里展示了2024年8月提交的所有订单。尽量简洁，只需要简短一句话即可。",
+                    "content": """你是一个助手，需要为用户生成描述性文字，用于辅助理解SQL查询到的结果内容。请注意：
+                    1. 不要包含具体的数值、数量、或内容，例如数字、列表中的项目、统计值等。
+                    2. 仅需生成一段简短的描述，概括SQL查询结果的意义或范围，不要假设查询结果的具体细节。
+                    3. 回答内容应完全基于用户问题的内容。
+                    示例：
+                    问题：请列出2024年8月提交的所有订单。
+                    回答：这里展示了2024年8月提交的所有订单。
+
+                    问题：查询南京天悦锦麟项目的所有客户名称和合同金额。
+                    回答：以下内容展示了南京天悦锦麟项目中所有客户的名称和合同金额。""",
                 }
             else:
+                
                 second_message = {
                     "role": "user",
-                    "content": f"为了回答这个问题，生成SQL代码： {sql_code} 查询数据库，SQL查询返回结果为 {sql_exec_dict['sql_results']} ，请根据返回结果回答问题，请生成总结式的概括，尽可能简洁，你可以假装用户已经获取需要的数据，而不要在回答中直接展示数据。",
+                    "content": f"""
+                    为了回答这个问题，使用正确的SQL雨具查询数据库，返回结果的列名为：{sql_exec_dict['translated']}，每行内容为 {sql_exec_dict['sql_results']} ，请根据返回结果回答问题，请生成总结式的概括，尽可能简洁，你可以假装用户已经获取需要的数据，而不要在回答中直接展示数据。当用户未指定输出格式时，按下面的默认规范显示：
+                    金额：单位为万元，按千分位展示，比如 19,341 万元。
+                    套数：单位为套，按千分位展示，比如 12,247 套。
+                    面积：单位为平方米，按千分位展示，比如 1325 平方米。
+                    百分比：单位为%，按千分位展示，比如 41%。
+                    仅需进行简短的概括式的描述，而无需对数据进行分析。尽可能简洁。
+                    """,
                 }
             copy_messages.delete_system_messages_temp()
             copy_messages.messages_append(second_message)

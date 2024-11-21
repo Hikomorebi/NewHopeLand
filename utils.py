@@ -34,7 +34,7 @@ def format_decimal_value(value):
 
     # 对于其他数值，保留两位小数并四舍五入
     # 使用 ROUND_HALF_UP 来确保正确的舍入
-    formatted_value = value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    formatted_value = value.quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
 
     # 如果结果是整数，例如 1689.00，转换为整数形式
     if formatted_value == formatted_value.to_integral_value():
@@ -52,7 +52,7 @@ def get_sql_results_json(translated_column_names, type_codes, results, sql_query
     response_columns = []
     for i in range(len(translated_column_names)):
         # 如果是数值型
-        if type_codes[i] == 1700:
+        if type_codes[i] in [1700,701,23]:
             numbers = [x for x in response_data[translated_column_names[i]] if x is not None]
             if numbers == []:
                 response_columns.append({"name":translated_column_names[i],"field_type":"指标","default_display":True if i in positions else False,"stats":{}})
@@ -348,7 +348,7 @@ def get_indicator_names(cursor):
     indicator_names = [row[0] for row in result if row[0] is not None]
     return indicator_names
 def get_indicator_data(cursor,indicator_name):
-    query = "SELECT NAME,FIELD_NAME,CALCULATION_RULES,DATA_TABLE_NAME FROM NH_INDICATOR_MANAGEMENT WHERE `NAME` = %s"
+    query = "SELECT NAME,FIELD_NAME,CALCULATION_RULES,DATA_SOURCE FROM NH_INDICATOR_MANAGEMENT WHERE `NAME` = %s"
     cursor.execute(query, (indicator_name,))
     result = cursor.fetchone()
     if result:
@@ -456,10 +456,25 @@ def process_user_input(user_question):
         # 如果找到干预问题，返回预设的SQL语句
         print(f"Intervention found: {preset_sql}")
         # 关闭数据库连接
-        cursor.close()
-        conn.close()
+
         process_user_input_dict["status"] = 1
         process_user_input_dict["preset_sql"] = preset_sql
+        process_user_input_dict["is_indicator"] = False
+
+        indicator_names = get_indicator_names(cursor)
+
+        indicator_name = match_indicator(user_question,indicator_names)
+
+        if indicator_name:
+            # 如果找到匹配的指标，返回匹配的指标
+            # 关闭数据库连接
+            indicator_data = get_indicator_data(cursor,indicator_name)
+            process_user_input_dict["is_indicator"] = True
+            process_user_input_dict["indicator_name"] = indicator_name
+            process_user_input_dict["indicator_data"] = indicator_data
+            
+        cursor.close()
+        conn.close()
         return process_user_input_dict
     else:
         # 如果没有找到干预问题，进行指标匹配
@@ -533,6 +548,7 @@ def dws_connect(sql_query,key_fields=None,display_type="response_bar_chart"):
                 )
                 dws_connect_dict["sql_results"] = sql_results
             translated_column_names = get_translate_column_names(column_names)
+            dws_connect_dict["translated"] = translated_column_names
             sql_results_json = get_sql_results_json(translated_column_names, type_codes, results, sql_query, results_length, positions, display_type)
             dws_connect_dict["status"] = 1
             dws_connect_dict["sql_results_json"] = sql_results_json
@@ -718,4 +734,4 @@ def dict_intersection(dict1, dict2):
 if __name__ == "__main__":
 
     #dws_connect_test("select subtosign_period/newvisittosub_num as subtosignavgcycle,subtosign_num as subtosignunits from fdc_ads.ads_salesreport_subscranalyse_a_min where statdate = current_date")
-    dws_connect("SELECT * FROM fdc_ads.ads_salesreport_subscranalyse_a_min WHERE statdate >= '2024-10-01' AND statdate <= '2024-10-07'")
+    dws_connect("""SELECT newvisittosub_period / newvisittosub_num AS visittosubavgcycle, newvisittosub_num AS visittosubunits FROM fdc_ads.ads_salesreport_subscranalyse_a_min WHERE statdate BETWEEN '2023-01-01' AND '2023-01-31' AND orgname LIKE '%宁波堇麟上府云汀%' AND orgtype = '西部区域公司'; """)
