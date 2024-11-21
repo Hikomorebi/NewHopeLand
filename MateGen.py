@@ -192,10 +192,6 @@ class MateGen:
                 return chat_dict
             copy_messages = copy.deepcopy(self.messages)
             if sql_exec_dict["is_long"]:
-                # second_message = {
-                #     "role": "user",
-                #     "content": "由于查询结果数据量较大，无法全部展示。但是用户已经得到所需的全部数据。根据问题请生成一段简要的描述性文字，用于配合用户得到的数据，描述查询结果的概况。例如问题：请列出2024年8月提交的所有订单。你的回答：这里展示了2024年8月提交的所有订单。尽量简洁，只需要简短一句话即可。",
-                # }
                 second_message = {
                     "role": "user",
                     "content": """你是一个助手，需要为用户生成描述性文字，用于辅助理解SQL查询到的结果内容。请注意：
@@ -214,7 +210,8 @@ class MateGen:
                 second_message = {
                     "role": "user",
                     "content": f"""
-                    为了回答这个问题，使用正确的SQL雨具查询数据库，返回结果的列名为：{sql_exec_dict['translated']}，每行内容为 {sql_exec_dict['sql_results']} ，请根据返回结果回答问题，请生成总结式的概括，尽可能简洁，你可以假装用户已经获取需要的数据，而不要在回答中直接展示数据。当用户未指定输出格式时，按下面的默认规范显示：
+                    为了回答这个问题，使用SQL语句查询数据库返回结果，列名为：{sql_exec_dict['translated']}，每行内容为 {sql_exec_dict['sql_results']} ，请根据返回结果回答问题，请生成总结式的概括，尽可能简洁，当用户
+                    未指定输出格式时，按下面的默认规范显示：
                     金额：单位为万元，按千分位展示，比如 19,341 万元。
                     套数：单位为套，按千分位展示，比如 12,247 套。
                     面积：单位为平方米，按千分位展示，比如 1325 平方米。

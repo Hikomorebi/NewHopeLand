@@ -6,7 +6,7 @@ import time
 
 def post_chat(query):
     # 接口地址
-    url = "http://me.ilisa.team:45108/chat"
+    url = "http://me.ilisa.team:45107/chat"
     headers = {"Content-Type": "application/json"}
     #data = {"session_id":"2","query": query,"dataSource":'{"fdc_dws":["dws_proj_room_totalsale_a_min"]}'}
     data = {"session_id":"5","query": query,"dataSource":''}
@@ -58,7 +58,7 @@ def post_chat(query):
     except Exception as e:
         print("Exception occurred:", str(e))
 
-post_chat("今年国庆期间的新增认购？")
+post_chat("今年国庆锦麟湖院的新增认购？")
 #post_chat("认签比完成最差的项目有哪些")
 #post_chat("查询当月签约达成率")
 #post_chat("当月的新增认购套数和金额是多少？")

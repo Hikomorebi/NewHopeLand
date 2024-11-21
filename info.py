@@ -2,7 +2,7 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 from transformers import AutoTokenizer, AutoModel
 import torch
-
+import pickle
 
 # 定义均值池化函数
 def mean_pooling(model_output, attention_mask):
@@ -248,12 +248,14 @@ def find_similar_customers(new_description, embeddings, historical_data):
     most_similar_index = torch.argmax(similarities).item()
     return historical_data[most_similar_index]
 
+if __name__ == "__main__":
+    # 查询历史客户信息
+    historical_data = query_history_customer_info()
+    with open('./Database/historical_data.pkl', 'wb') as file:
+        pickle.dump(historical_data, file)
+    # 转换历史数据为自然语言描述
+    historical_descriptions = data_to_natural_language(historical_data)
 
-# 查询历史客户信息
-historical_data = query_history_customer_info()
-
-# 转换历史数据为自然语言描述
-historical_descriptions = data_to_natural_language(historical_data)
-
-# 将自然语言描述转换为向量
-knowledge_base = convert_to_embeddings(historical_descriptions)
+    # 将自然语言描述转换为向量
+    knowledge_base = convert_to_embeddings(historical_descriptions)
+    torch.save(knowledge_base, './Database/knowledge_base.pth')

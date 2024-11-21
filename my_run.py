@@ -14,9 +14,6 @@ from utils import (
     get_session_messages,
     test_match,
     dict_intersection,
-    #read_csv_data,
-    #get_project_ids_for_sales_manager,
-    #query_subordinates,
     process_user_input,
     select_table_based_on_indicator,
 )
@@ -377,7 +374,7 @@ def analysis():
 
         json_report = generate_json_report(customer_data,projectId,projectName)
 
-        report_filename = f"高意向客户分析报告_{saleropenid}.json"
+        report_filename = f"Reports/高意向客户分析报告_{saleropenid}.json"
         with open(report_filename, "w", encoding="utf-8") as file:
             # 美化输出JSON
             json.dump(json_report, file, ensure_ascii=False, indent=4)

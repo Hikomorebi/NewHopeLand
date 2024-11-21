@@ -6,13 +6,15 @@ from psycopg2.extras import RealDictCursor
 import json
 import re
 import csv
-from info import(
-    historical_data,
-    knowledge_base,
-    find_similar_customers
-)
+import pickle
+import torch
+from info import find_similar_customers
 # 设置环境变量（仅在当前脚本运行期间有效）
 os.environ["OPENAI_API_KEY"] = "sk-94987a750c924ae19693c9a9d7ea78f7"
+
+with open('./Database/historical_data.pkl', 'rb') as file:
+    historical_data = pickle.load(file)
+knowledge_base = torch.load('./Database/knowledge_base.pth')
 
 # 创建 OpenAI 客户端
 client = OpenAI(
@@ -489,7 +491,7 @@ def query_customer_info(saleropenid, start_date, end_date):
             """
             cursor.execute(sql, (saleropenid, start_date, end_date))
             result = cursor.fetchall()
-            print(f"查询客户信息成功！")
+            print("查询客户信息成功！")
             return result
     except Exception as e:
         print(f"查询客户信息时出错: {e}")
@@ -526,7 +528,7 @@ def query_visitornum_info():
             """
             cursor.execute(sql)
             result = cursor.fetchall()
-            print(f"查询来访人数信息成功！")
+            print("查询来访人数信息成功！")
             return result
     except Exception as e:
         print(f"查询来访人数信息时出错: {e}")

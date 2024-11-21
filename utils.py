@@ -538,7 +538,7 @@ def dws_connect(sql_query,key_fields=None,display_type="response_bar_chart"):
                 connection.close()
                 return dws_connect_dict
 
-            if results_length > 20:
+            if results_length > 1:
                 dws_connect_dict["is_long"] = True
                 # sql_results = json.dumps(results[:50], ensure_ascii=False, default=default_converter)
             else:
@@ -734,4 +734,4 @@ def dict_intersection(dict1, dict2):
 if __name__ == "__main__":
 
     #dws_connect_test("select subtosign_period/newvisittosub_num as subtosignavgcycle,subtosign_num as subtosignunits from fdc_ads.ads_salesreport_subscranalyse_a_min where statdate = current_date")
-    dws_connect("""SELECT newvisittosub_period / newvisittosub_num AS visittosubavgcycle, newvisittosub_num AS visittosubunits FROM fdc_ads.ads_salesreport_subscranalyse_a_min WHERE statdate BETWEEN '2023-01-01' AND '2023-01-31' AND orgname LIKE '%宁波堇麟上府云汀%' AND orgtype = '西部区域公司'; """)
+    dws_connect("""SELECT SUM(subscramount) AS 新增认购金额, COUNT(1) AS 新增认购套数 FROM fdc_dwd.dwd_trade_roomsubscr_a_min WHERE partitiondate = current_date AND subscrexecdate BETWEEN '2024-10-01' AND '2024-10-07' AND (subscrstatus = '激活' OR closereason = '转签约') AND projname = '锦达到麟湖院' HAVING COUNT(1) > 0""")

@@ -3,11 +3,11 @@ import json
 import re
 
 
-def post_analysis(saleropenid,start_date,end_date):
+def post_analysis():
     # 接口地址
-    url = "http://me.ilisa.team:45102/analysis"
+    url = "http://me.ilisa.team:45108/analysis"
     headers = {"Content-Type": "application/json"}
-    data = {"saleropenid": saleropenid,"start_date":start_date,"end_date":end_date}
+    data = {"saleropenid":"oFUZO5y9WDfaH-JVkkchVCRuLfRo","projectId":"8217","projectName":"华东公司四季春晓","start_date":"2024-11-20 00:00:00","end_date":"2024-11-20 23:59:59"}
 
     try:
         response = requests.post(url, headers=headers, data=json.dumps(data))
@@ -24,4 +24,4 @@ def post_analysis(saleropenid,start_date,end_date):
         print("Exception occurred:", str(e))
 
 
-post_analysis("oFUZO5xjO671mxo3fSQ3Fkldlaj8","2024-01-01","2024-10-31")
+post_analysis()
