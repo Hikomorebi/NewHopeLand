@@ -317,6 +317,7 @@ def chat():
             print(final_response)
             finish_info = {
                 "sql_code": chat_dict["sql_code"],
+                "column_names":chat_dict["column_names"],
                 "sql_response": chat_dict["sql_results_json"],
                 "chosen_tables": chat_dict["chosen_tables"],
                 "time": chat_dict["time"],

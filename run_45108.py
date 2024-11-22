@@ -14,9 +14,6 @@ from utils import (
     get_session_messages,
     test_match,
     dict_intersection,
-    #read_csv_data,
-    #get_project_ids_for_sales_manager,
-    #query_subordinates,
     process_user_input,
     select_table_based_on_indicator,
 )
@@ -320,6 +317,7 @@ def chat():
             print(final_response)
             finish_info = {
                 "sql_code": chat_dict["sql_code"],
+                "column_names":chat_dict["column_names"],
                 "sql_response": chat_dict["sql_results_json"],
                 "chosen_tables": chat_dict["chosen_tables"],
                 "time": chat_dict["time"],
@@ -377,7 +375,7 @@ def analysis():
 
         json_report = generate_json_report(customer_data,projectId,projectName)
 
-        report_filename = f"高意向客户分析报告_{saleropenid}.json"
+        report_filename = f"Reports/高意向客户分析报告_{saleropenid}.json"
         with open(report_filename, "w", encoding="utf-8") as file:
             # 美化输出JSON
             json.dump(json_report, file, ensure_ascii=False, indent=4)

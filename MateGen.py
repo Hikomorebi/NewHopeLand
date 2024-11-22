@@ -225,6 +225,7 @@ class MateGen:
             chat_dict["status"] = 3
             chat_dict["sql_results_json"] = sql_exec_dict["sql_results_json"]
             chat_dict["sql_code"] = sql_code
+            chat_dict["column_names"] = sql_exec_dict["column_names"]
             response_message_stream = get_gpt_response_stream(
                 self.client, self.model, copy_messages
             )

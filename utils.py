@@ -551,6 +551,7 @@ def dws_connect(sql_query,key_fields=None,display_type="response_bar_chart"):
             dws_connect_dict["translated"] = translated_column_names
             sql_results_json = get_sql_results_json(translated_column_names, type_codes, results, sql_query, results_length, positions, display_type)
             dws_connect_dict["status"] = 1
+            dws_connect_dict["column_names"] = list(column_names)
             dws_connect_dict["sql_results_json"] = sql_results_json
     except Exception as e:
         traceback.print_exc()
@@ -708,4 +709,4 @@ def dict_intersection(dict1, dict2):
 if __name__ == "__main__":
 
     #dws_connect_test("select subtosign_period/newvisittosub_num as subtosignavgcycle,subtosign_num as subtosignunits from fdc_ads.ads_salesreport_subscranalyse_a_min where statdate = current_date")
-    dws_connect("""SELECT SUM(subscramount) AS 新增认购金额, COUNT(1) AS 新增认购套数 FROM fdc_dwd.dwd_trade_roomsubscr_a_min WHERE partitiondate = current_date AND subscrexecdate BETWEEN '2024-10-01' AND '2024-10-07' AND (subscrstatus = '激活' OR closereason = '转签约') AND projname = '锦达到麟湖院' HAVING COUNT(1) > 0""")
+    dws_connect("""SELECT SUM(subscramount) AS 新增认购金额, COUNT(1) AS 新增认购套数 FROM fdc_dwd.dwd_trade_roomsubscr_a_min WHERE partitiondate = current_date AND subscrexecdate BETWEEN '2024-10-01' AND '2024-10-07' AND (subscrstatus = '激活' OR closereason = '转签约') AND projname = '锦达到麟湖院'""")
