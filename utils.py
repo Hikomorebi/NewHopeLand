@@ -15,6 +15,8 @@ import csv
 # 设置环境变量（仅在当前脚本运行期间有效）
 os.environ["OPENAI_API_KEY"] = "sk-94987a750c924ae19693c9a9d7ea78f7"
 
+with open("indicator_map.json", "r", encoding="utf-8") as file:
+    indicator_map = json.load(file)
 with open("en2ch.json", "r", encoding="utf-8") as file:
     en2zh_json = json.load(file)
 
@@ -52,7 +54,7 @@ def get_sql_results_json(translated_column_names, type_codes, results, sql_query
     response_columns = []
     for i in range(len(translated_column_names)):
         # 如果是数值型
-        if type_codes[i] in [1700,701,23]:
+        if type_codes[i] in [1700,700,701,23,20]:
             numbers = [x for x in response_data[translated_column_names[i]] if x is not None]
             if numbers == []:
                 response_columns.append({"name":translated_column_names[i],"field_type":"指标","default_display":True if i in positions else False,"stats":{}})
@@ -326,7 +328,7 @@ def get_similarity(query1, query2):
 
 # 查询干预问题
 # 更新查询干预问题的函数以包括相似度匹配
-def get_intervention_sql(cursor, user_question, similarity_threshold=0.7):
+def get_intervention_sql(cursor, user_question, similarity_threshold=1.0):
     query = """  
     SELECT question_name, select_sql  
     FROM nh_problem_meddle  
@@ -450,16 +452,14 @@ def process_user_input(user_question):
         print(f"Modified question: {user_question}")
 
     # 查询干预问题对应的SQL语句
-    preset_sql = get_intervention_sql(cursor, user_question)
+    preset_sql = get_intervention_sql(cursor, user_question,similarity_threshold=1.0)
 
     if preset_sql:
         # 如果找到干预问题，返回预设的SQL语句
         print(f"Intervention found: {preset_sql}")
-        # 关闭数据库连接
 
         process_user_input_dict["status"] = 1
         process_user_input_dict["preset_sql"] = preset_sql
-        process_user_input_dict["is_indicator"] = False
 
         indicator_names = get_indicator_names(cursor)
 
@@ -467,14 +467,17 @@ def process_user_input(user_question):
 
         if indicator_name:
             # 如果找到匹配的指标，返回匹配的指标
-            # 关闭数据库连接
             indicator_data = get_indicator_data(cursor,indicator_name)
-            process_user_input_dict["is_indicator"] = True
+            if indicator_name in indicator_map:
+                indicator_name = indicator_map[indicator_name]
             process_user_input_dict["indicator_name"] = indicator_name
             process_user_input_dict["indicator_data"] = indicator_data
+        else:
+            process_user_input_dict["indicator_name"] = "base"
             
         cursor.close()
         conn.close()
+        process_user_input_dict["user_question"] = user_question
         return process_user_input_dict
     else:
         # 如果没有找到干预问题，进行指标匹配
@@ -485,17 +488,20 @@ def process_user_input(user_question):
 
         if indicator_name:
             # 如果找到匹配的指标，返回匹配的指标
-            # 关闭数据库连接
             indicator_data = get_indicator_data(cursor,indicator_name)
             cursor.close()
             conn.close()
             process_user_input_dict["status"] = 2
+            if indicator_name in indicator_map:
+                indicator_name = indicator_map[indicator_name]
             process_user_input_dict["indicator_name"] = indicator_name
             process_user_input_dict["indicator_data"] = indicator_data
+            process_user_input_dict["user_question"] = user_question
             return process_user_input_dict
         else:
             process_user_input_dict["status"] = 3
             process_user_input_dict["user_question"] = user_question
+            process_user_input_dict["indicator_name"] = "base"
             return process_user_input_dict
 
 def dws_connect(sql_query,key_fields=None,display_type="response_bar_chart"):
@@ -667,6 +673,7 @@ def test_match(user_question):
     cursor.close()
     conn.close()
     return indicator_name
+
 def select_table_based_on_indicator(indicator_tables):
     try:
         table_str = indicator_tables.strip()
@@ -709,4 +716,6 @@ def dict_intersection(dict1, dict2):
 if __name__ == "__main__":
 
     #dws_connect_test("select subtosign_period/newvisittosub_num as subtosignavgcycle,subtosign_num as subtosignunits from fdc_ads.ads_salesreport_subscranalyse_a_min where statdate = current_date")
-    dws_connect("""SELECT SUM(subscramount) AS 新增认购金额, COUNT(1) AS 新增认购套数 FROM fdc_dwd.dwd_trade_roomsubscr_a_min WHERE partitiondate = current_date AND subscrexecdate BETWEEN '2024-10-01' AND '2024-10-07' AND (subscrstatus = '激活' OR closereason = '转签约') AND projname = '锦达到麟湖院'""")
+    dws_connect("""SELECT question_name, select_sql  
+    FROM nh_problem_meddle  
+    WHERE enabled = 'ENABLE' AND DELETE_FLAG = 'NOT_DELETE'""")

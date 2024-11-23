@@ -1,0 +1,18 @@
+{
+    "认签比":{
+        "chosen_tables":{"fdc_dwd":["dwd_trade_roomsubscr_a_min"],"fdc_dws":["dws_proj_projplansum_a_h"]},
+        "prompt":"SystemPrompts/subsignrate.txt"
+    },
+    "签约达成率":{
+        "chosen_tables":{"fdc_dwd":["dwd_trade_roomsign_a_min"],"fdc_dws":["dws_proj_projplansum_a_h"]},
+        "prompt":"SystemPrompts/signrate.txt"
+    },
+    "认购缺口":{
+        "chosen_tables":{"fdc_dwd":["dwd_trade_roomsubscr_a_min"],"fdc_dws":["dws_proj_projplansum_a_h"]},
+        "prompt":"SystemPrompts/subgap.txt"
+    },
+    "来访组数":{
+        "chosen_tables":{"fdc_dwd":"dwd_cust_custvisitflow_a_min"},
+        "prompt":"SystemPrompts/visitgroup.txt"
+    }
+}

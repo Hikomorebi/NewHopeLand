@@ -93,6 +93,8 @@ class MateGen:
         model="gpt-3.5-turbo",
         system_content_list=[],
         tokens_thr=150000,
+        current_indicator=None,
+        current_count=0
     ):
         self.client = OpenAI(
             api_key=api_key if api_key else os.getenv("OPENAI_API_KEY"),
@@ -106,15 +108,15 @@ class MateGen:
         self.messages = ChatMessages(
             system_content_list=self.system_content_list, tokens_thr=self.tokens_thr
         )
+        self.current_indicator = current_indicator
+        self.current_count = current_count
 
-    def chat(self, question=None,process_user_input_dict=None):
+    def chat(self, process_user_input_dict=None):
         # status:0表示大模型调用失败，1表示无需生成SQL语句，2表示生成SQL错误，3表示成功生成SQL语句
         chat_dict = {"time":"\n"}
-        if question is not None:
-            if process_user_input_dict['status'] == 3:
-                user_message = {"role": "user", "content": process_user_input_dict['user_question']}
-            else:
-                user_message = {"role": "user", "content": question}
+        if process_user_input_dict is not None:
+            question = process_user_input_dict['user_question']
+            user_message = {"role": "user", "content": question}
             self.messages.messages_append(user_message)
             before_get_sql = time.time()
             if process_user_input_dict["status"] == 1:

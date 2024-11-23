@@ -1,28 +1,26 @@
 认签比和认签达成进度是两个需要计算的指标，默认按本月进行计算，其计算规则是
-select a.cityname as 公司,
-a.subscramount/nullif(b.plansignamount, 0) as 认签比,
-a.subscramount as 月度新增认购金额,
-b.plansignamount as 月度签约任务,
-nvl(a.subscramount/nullif(b.plansignamount, 0), 0) - EXTRACT(DAY FROM CURRENT_DATE)::FLOAT / EXTRACT(DAY FROM last_day(current_date)) 认签达成进度
+select a.projname as 项目
+,b.subscramount/nullif(a.plansignamount, 0) as 认签比
+,nvl(b.subscramount/nullif(a.plansignamount, 0), 0) - EXTRACT(DAY FROM CURRENT_DATE)::FLOAT / EXTRACT(DAY FROM last_day(current_date)) 认签达成进度
+,EXTRACT(DAY FROM CURRENT_DATE)::FLOAT / EXTRACT(DAY FROM last_day(current_date)) 当月时间进度
 from 
 (
-    select citycode, cityname, sum(subscramount) as subscramount
+    select projname, projcode, ${month}PlanSignAmount as plansignamount
+    from fdc_dws.dws_proj_projplansum_a_h where partitiondate = current_date
+    and years = left(current_date, 4)
+) a
+left join
+(
+    select projcode, sum(subscramount) as subscramount
     from fdc_dwd.dwd_trade_roomsubscr_a_min 
     where partitiondate = current_date 
     and subscrexecdate between date_trunc('month', current_date) and current_date and (subscrstatus = '激活' or closereason = '转签约')
-    group by 1,2
-) a
-left join 
-(
-    select cityCode, sum(${month}PlanSignAmount) plansignamount
-    from fdc_dws.dws_proj_projplansum_a_h where partitiondate = current_date
-    and years = left(current_date, 4)
-    group by citycode
-) b on a.citycode = b.citycode;
+    group by 1
+) b on a.projcode = b.projcode;
 其中模板变量 ${month} 被用来动态生成查询条件，如果当前月份是1月，则 ${month} 会被替换为 m1，生成字段名 m1PlanSignAmount。
 你是一名数据库专家，请根据计算规则生成正确的PostgreSQL语句。要求如下：
 1. 请仔细阅读并理解用户的请求。参考数据库字典提供的表结构和各字段信息，根据计算规则生成正确的PostgreSQL语句。
-2. 请完全按照提供的计算规则模板来设计SQL语句，不要修改计算规则的结构，计算规则中带有'$'符号作为占位符，你需要从用户问题中提取相关的时间等信息来填充占位符。请确保所有占位符都被具体的值填充。
+2. 请完全按照提供的计算规则模板来设计SQL语句，可以根据问题增加具体的筛选条件，但不要修改计算规则的逻辑。
 3. 请确保所有字段和条件都使用具体的值。禁止随意假设不存在的信息。请务必确保生成的SQL语句能够直接运行。
 4. 如果未指定具体月份，请按照当前月份2024年11月份进行计算。
 5. 若用户提问中涉及项目名称，请提取项目名称作为模糊匹配的筛选条件。项目名称可能包含城市名，应视为一个完整的字符串，不要拆分。如"成都皇冠湖壹号"可以通过 projname LIKE "%皇冠湖壹号%"进行模糊匹配。
@@ -31,8 +29,8 @@ left join
     "sql": "SQL Query to run",
 }
 要求只返回最终的json对象，不要包含其余内容。
-示例：查询当月认签比。
+示例：查询云镜项目认签比。
 回答：
 {
-    "sql:"select a.cityname as 公司, a.subscramount/nullif(b.plansignamount, 0) as 认签比, a.subscramount as 月度新增认购金额, b.plansignamount as 月度签约任务, nvl(a.subscramount/nullif(b.plansignamount, 0), 0) - EXTRACT(DAY FROM CURRENT_DATE)::FLOAT / EXTRACT(DAY FROM last_day(current_date)) as 认签达成进度 from (select citycode, cityname, sum(subscramount) as subscramount from fdc_dwd.dwd_trade_roomsubscr_a_min where partitiondate = current_date and subscrexecdate between date_trunc('month', current_date) and current_date and (subscrstatus = '激活' or closereason = '转签约') group by 1,2) a left join (select cityCode, sum(m11PlanSignAmount) as plansignamount from fdc_dws.dws_proj_projplansum_a_h where partitiondate = current_date and years = left(current_date, 4) group by citycode) b on a.citycode = b.citycode;"
+    "sql:"select a.projname as 项目, b.subscramount/nullif(a.plansignamount, 0) as 认签比, nvl(b.subscramount/nullif(a.plansignamount, 0), 0) - EXTRACT(DAY FROM CURRENT_DATE)::FLOAT / EXTRACT(DAY FROM last_day(current_date)) 认签达成进度, EXTRACT(DAY FROM CURRENT_DATE)::FLOAT / EXTRACT(DAY FROM last_day(current_date)) 当月时间进度 from (select projname, projcode, m11PlanSignAmount as plansignamount from fdc_dws.dws_proj_projplansum_a_h where partitiondate = current_date and years = left(current_date, 4) and projname like '%云境%') a left join (select projcode, sum(subscramount) as subscramount from fdc_dwd.dwd_trade_roomsubscr_a_min where partitiondate = current_date and subscrexecdate between date_trunc('month', current_date) and current_date and (subscrstatus = '激活' or closereason = '转签约') group by 1) b on a.projcode = b.projcode;"
 }
