@@ -59,7 +59,7 @@ def post_chat(query):
         print("Exception occurred:", str(e))
 
 
-
+post_chat("查询西部区域公司成都皇冠湖壹号本月权益后新增认购金额？")
 # 1
 #post_chat("本月新增认购")
 #post_chat("其中西部公司是多少")

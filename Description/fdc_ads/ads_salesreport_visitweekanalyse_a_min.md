@@ -1,5 +1,5 @@
 - 数据表名称
-ads_salesreport_visitweekanalyse_a_min
+fdc_ads.ads_salesreport_visitweekanalyse_a_min
 
 - 数据表解释
 
