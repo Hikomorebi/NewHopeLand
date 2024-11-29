@@ -428,7 +428,8 @@ def get_synonyms(cursor):
     WHERE ENABLED = 'ENABLE' AND DELETE_FLAG = 'NOT_DELETE'
     """
     cursor.execute(query)
-    return {row[0]: row[1] for row in cursor.fetchall()}
+    # return {row[0]: row[1] for row in cursor.fetchall()}
+    return {row[0]: row[1] for row in cursor.fetchall() if row[0] is not None and row[1] is not None}
 
 
 # 替换同义词

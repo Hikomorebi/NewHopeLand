@@ -31,7 +31,7 @@ def dws_connect_test(sql_query):
 
 
 query = """
-SELECT orgname, visitornum, newvisitornum, revisitornum FROM fdc_ads.ads_salesreport_visitweekanalyse_a_min WHERE statdate = current_date;
+SELECT rt_c.cityname, SUM(rt_c.sub_amt - rt_b.sub_amt) AS subamount FROM fdc_dws.dws_proj_room_totalsale_a_min rt_c LEFT JOIN fdc_dws.dws_proj_room_totalsale_a_min rt_b ON rt_c.datadate = '2024-11-01' AND rt_c.roomcode = rt_b.roomcode WHERE rt_b.datadate = current_date AND rt_c.partitiondate = current_date GROUP BY rt_c.cityname;
 """
 
 dws_connect_test(query)
