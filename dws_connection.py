@@ -31,7 +31,7 @@ def dws_connect_test(sql_query):
 
 
 query = """
-SELECT rt_c.cityname, SUM(rt_c.sub_amt - rt_b.sub_amt) AS subamount FROM fdc_dws.dws_proj_room_totalsale_a_min rt_c LEFT JOIN fdc_dws.dws_proj_room_totalsale_a_min rt_b ON rt_c.datadate = '2024-11-01' AND rt_c.roomcode = rt_b.roomcode WHERE rt_b.datadate = current_date AND rt_c.partitiondate = current_date GROUP BY rt_c.cityname;
+SELECT EXTRACT(MONTH FROM visitdate::timestamp) AS month, projname, SUM(visitorcount) AS total_visits, tradechannel FROM fdc_dwd.dwd_cust_custvisitflow_a_min WHERE projname LIKE '%武汉锦粼九里%' AND partitiondate = current_date AND visitdate::timestamp BETWEEN '2023-01-01' AND '2023-06-30' GROUP BY month, projname, tradechannel ORDER BY month;
 """
 
 dws_connect_test(query)

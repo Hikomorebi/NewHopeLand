@@ -18,5 +18,17 @@
     "新增认购":{
         "chosen_tables":{"fdc_dwd":["dwd_trade_roomsubscr_a_min"],"fdc_ads":["view_proj_equity_his"]},
         "prompt":"SystemPrompts/newsign.txt"
+    },
+    "认购金额":{
+        "chosen_tables":{"fdc_dws":["dws_proj_room_totalsale_a_min"]},
+        "prompt":"SystemPrompts/subsign.txt"
+    },
+    "来访转化率":{
+        "chosen_tables":{"fdc_ads":["ads_salesreport_visitweekanalyse_a_min"]},
+        "prompt":"SystemPrompts/visittosubratio.txt"
+    },
+    "首复访客户数":{
+        "chosen_tables":{"fdc_ads":["ads_salesreport_visitweekanalyse_a_min"]},
+        "prompt":"SystemPrompts/visitornum.txt"
     }
 }

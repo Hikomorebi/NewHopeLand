@@ -11,8 +11,6 @@ from utils import (
     default_converter,
     query_tables_description,
     query_few_shots,
-    get_session_messages,
-    test_match,
     dict_intersection,
     process_user_input,
     select_table_based_on_indicator,
@@ -29,16 +27,14 @@ with open("indicator_prompt.json", "r", encoding="utf-8") as file:
 
 system_prompt_common = """
 你是一名数据库专家，请根据用户的输入回答问题。
-1. 首先，请仔细阅读并理解用户的请求，使用地产销售数据字典提供的表结构和各字段信息创建正确的 PostgreSQL 语句。
+1. 请仔细阅读并理解用户的请求，使用地产销售数据字典提供的信息创建正确的 PostgreSQL 语句。
 2. 只能使用提供的数据字典信息生成正确的 PostgreSQL 语句。请生成完整的、可执行的SQL语句，确保所有字段和条件都使用具体的值，禁止包含任何形式的占位符或模板变量，禁止随意假设不存在的信息。
 3. 在生成SQL时，请注意不要混淆表与列之间的关系。确保选择的表和列与用户的请求相匹配。
 4. 请确保SQL的正确性，包括语法、表名、列名以及日期格式等。同时，确保查询在正确条件下的性能优化。
-5. 如果数据字典中存在 partitiondate 字段，请在生成SQL语句的筛选条件中加入 partitiondate = current_date 。
-6. 如果用户请求的是一段时间内的数据，请确保SQL语句能够正确提取这段时间内的数据。如询问当日的数据，可以使用 current_date 作为筛选条件。如果问题涉及到今年或者本月，请自动理解为当前时间为2024年11月。
-7. 生成的SQL语句不能涵盖非法字符如"\n"。
-8. 生成的SQL语句选择的字段分为核心字段和相关字段，核心字段是与用户需求连接最紧密的字段，相关字段是与用户需求相关的其他字段，用于确保信息的完整性。请将核心字段放入返回要求格式的 key_fields 参数值中。
-9. 若用户提问中涉及项目名称，请提取项目名称作为模糊匹配的筛选条件。项目名称可能包含城市名，应视为一个完整的字符串，不要拆分。如"成都皇冠湖壹号","温州立体城"可以通过"%皇冠湖壹号%"和"%立体城%"进行模糊匹配。
-10. 请从如下给出的展示方式种选择最优的一种用以进行数据渲染，将类型名称放入返回要求格式的 display_type 参数值中，可用数据展示方式如下:
+5. 如果用户请求的是一段时间内的数据，请确保SQL语句能够正确提取这段时间内的数据。如询问当日的数据，可以使用 current_date 作为筛选条件。如果问题涉及到今年或者本月，请自动理解为当前时间为2024年11月。
+6. 生成的SQL语句不能涵盖非法字符如"\n"。
+7. 生成的SQL语句选择的字段分为核心字段和相关字段，核心字段是与用户需求连接最紧密的字段，相关字段是与用户需求相关的其他字段，用于确保信息的完整性。请将核心字段放入返回要求格式的 key_fields 参数值中。
+8. 请从如下给出的展示方式种选择最优的一种用以进行数据渲染，将类型名称放入返回要求格式的 display_type 参数值中，可用数据展示方式如下:
 {
     "response_line_chart": "用于显示对比趋势分析数据",
     "response_pie_chart": "适用于比例和分布统计场景",
@@ -55,6 +51,7 @@ system_prompt_common = """
 如下给出示例：
 <few_shots>
 """
+
 system_prompt_indicator_template = """
 {indicator_name}是一个需要计算的指标，它的字段名为{indicator_field_name}，计算规则为:
 {indicator_rule};
@@ -62,10 +59,9 @@ system_prompt_indicator_template = """
 1. 请仔细阅读并理解用户的请求。参考数据库字典提供的表结构和各字段信息，根据计算规则生成正确的PostgreSQL语句。
 2. 请完全按照提供的计算规则模板来设计SQL语句，可以根据问题增加具体的筛选条件，但不要修改计算规则的逻辑。如果计算规则中带有'$'符号作为占位符，需要从用户问题中提取相关的时间等信息来填充占位符。请确保所有占位符都被具体的值填充。
 3. 请确保所有字段和条件都使用具体的值。禁止随意假设不存在的信息。请务必确保生成的SQL语句能够直接运行。
-4. 如果数据字典中存在 partitiondate 字段，请在生成SQL语句的筛选条件中加入 partitiondate = current_date 。如果计算规则中存在 partitiondate 字段，则将该字段值筛选条件设为 current_date 。
+4. 如果计算规则中存在 partitiondate 字段，则将该字段值筛选条件设为 current_date 。
 5. 如果用户请求的是一段时间内的数据，请确保SQL语句能够正确提取这段时间内的数据。如询问当日的数据，可以使用 current_date 作为筛选条件。
 6. 如果问题涉及到相对时间，如今年、当月，请按照当前时间为 2024 年 11 月份进行计算。
-7. 若用户提问中涉及项目名称，且数据字典中有 projname 字段，请提取项目名称作为模糊匹配的筛选条件。项目名称可能包含城市名，应视为一个完整的字符串，不要拆分。如"成都皇冠湖壹号"可以通过 projname LIKE "%皇冠湖壹号%"进行模糊匹配。
 请严格按照计算规则的逻辑给出SQL代码，并按照以下JSON格式响应：
 {{
     "sql": "SQL Query to run",
@@ -73,14 +69,6 @@ system_prompt_indicator_template = """
 要求只返回最终的json对象，不要包含其余内容。
 """
 
-with open('SystemPrompts/subsignrate.txt', 'r', encoding='utf-8') as file:
-    system_prompt_subsignrate = file.read()
-with open('SystemPrompts/signrate.txt', 'r', encoding='utf-8') as file:
-    system_prompt_signrate = file.read()
-with open('SystemPrompts/subgap.txt', 'r', encoding='utf-8') as file:
-    system_prompt_subgap = file.read()
-with open('SystemPrompts/visitgroup.txt', 'r', encoding='utf-8') as file:
-    system_prompt_visitgroup = file.read()
 
 mategen_dict = {}
 all_tables = {
@@ -184,6 +172,7 @@ def chat():
                 )
                 indicator_name = process_user_input_dict["indicator_name"]
                 if indicator_name in indicator_prompt_dict:
+                    print("特殊指标！")
                     chosen_tables = indicator_prompt_dict[indicator_name]['chosen_tables']
                 else:
                     chosen_tables = select_table_based_on_indicator(
