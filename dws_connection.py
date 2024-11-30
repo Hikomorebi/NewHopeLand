@@ -31,7 +31,7 @@ def dws_connect_test(sql_query):
 
 
 query = """
-SELECT EXTRACT(MONTH FROM visitdate::timestamp) AS month, projname, SUM(visitorcount) AS total_visits, tradechannel FROM fdc_dwd.dwd_cust_custvisitflow_a_min WHERE projname LIKE '%武汉锦粼九里%' AND partitiondate = current_date AND visitdate::timestamp BETWEEN '2023-01-01' AND '2023-06-30' GROUP BY month, projname, tradechannel ORDER BY month;
+SELECT custname, mobilephone, visitdate, projname FROM fdc_dwd.dwd_cust_custvisitflow_a_min WHERE projname LIKE '%成都%' AND partitiondate = current_date AND visitdate::timestamp >= date_trunc('month', current_date - interval '1 month') AND visitdate::timestamp < date_trunc('month', current_date) ORDER BY visitdate;
 """
 
 dws_connect_test(query)

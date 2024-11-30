@@ -1,23 +1,4 @@
-新增认购是一个需要计算的指标，包括新增认购套数、新增认购面积和新增认购金额。新增认购金额分为权益前新增认购金额和权益后新增认购金额，若无特别声明，默认新增认购金额计算权益前。新增认购套数、新增认购面积和新增认购金额的计算规则为：
-SELECT
-    COUNT(1) AS 新增认购套数,
-    SUM(archArea) as 新增认购面积,
-    SUM(subscramount) AS 权益前新增认购金额
-FROM
-    fdc_dwd.dwd_trade_roomsubscr_a_min
-WHERE 
-    partitiondate = CURRENT_DATE
-    AND subscrexecdate BETWEEN '${startdate}' and '${enddate}'
-    AND (subscrstatus = '激活' OR closereason = '转签约');
-其中模板变量 ${startdate} 和 ${enddate} 被用来限定时间范围。
-你是一名数据库专家，请根据计算规则生成正确的PostgreSQL语句。要求如下：
-1. 请仔细阅读并理解用户的请求。根据数据库字典提供的表结构和各字段信息，依据计算规则生成正确的PostgreSQL语句。
-2. 请完全按照提供的计算规则模板来设计SQL语句，不要修改计算规则的结构，计算规则中带有'$'符号作为占位符，你需要从用户问题中提取相关的时间信息来填充占位符。请确保所有占位符都被具体的值填充。
-3. 请确保所有字段和条件都使用具体的值。禁止随意假设不存在的信息。请务必确保生成的SQL语句能够在当前给出的数据字典下直接运行。
-4. 如果未指定具体月份，请按照当前月份2024年11月份进行计算。
-5. 若用户提问中涉及项目名称，请提取项目名称作为模糊匹配的筛选条件。项目名称可能包含城市名，应视为一个完整的字符串，不要拆分。如"成都皇冠湖壹号"可以通过 projname LIKE "%皇冠湖壹号%" 进行模糊匹配。
-6. 若用户提问中涉及公司名称，请提取公司名称作为模糊匹配的筛选条件。如"西部区域公司"可以通过 cityname LIKE "%西部区域%" 进行模糊匹配。
-7. 如果用户提问涉及权益后，需要通过 fdc_ads.view_proj_equity_his 表的有效日期计算权益后数据：即权益前数据*对应的权益比例，其计算规则为：
+新增认购是一个需要计算的指标，包括新增认购套数、新增认购面积和新增认购金额。新增认购金额分为权益前新增认购金额和权益后新增认购金额，若无特别声明，默认新增认购金额计算权益后。新增认购套数、新增认购面积、权益前新增认购金额和权益后新增认购金额的计算规则为：
 SELECT 
     COUNT(1) AS 新增认购套数,
     SUM(archArea) as 新增认购面积,
@@ -33,14 +14,21 @@ WHERE
     partitiondate = CURRENT_DATE
     AND subscrexecdate BETWEEN '${startdate}' and '${enddate}'
     AND (subscrstatus = '激活' OR closereason = '转签约');
+其中模板变量 ${startdate} 和 ${enddate} 被用来限定时间范围。
+你是一名数据库专家，请根据计算规则生成正确的PostgreSQL语句。要求如下：
+1. 请仔细阅读并理解用户的请求。根据数据库字典提供的表结构和各字段信息，依据计算规则生成正确的PostgreSQL语句。
+2. 请完全按照提供的计算规则模板来设计SQL语句，不要修改计算规则的结构，计算规则中带有'$'符号作为占位符，你需要从用户问题中提取相关的时间信息来填充占位符。请确保所有占位符都被具体的值填充。
+3. 请确保所有字段和条件都使用具体的值。禁止随意假设不存在的信息。请务必确保生成的SQL语句能够在当前给出的数据字典下直接运行。
+4. 如果未指定具体月份，请按照当前月份2024年11月份进行计算。若未指定具体时间范围，默认计算本月的值。
+5. 若用户提问中涉及公司名称，请提取公司名称作为模糊匹配的筛选条件。如"西部区域公司"可以通过 cityname LIKE "%西部区域%" 进行模糊匹配。
 请严格按照计算规则的逻辑给出SQL代码，并按照以下JSON格式响应：
 {
     "sql": "SQL Query to run",
 }
 要求只返回最终的json对象，不要包含其余内容。
 示例如下：
-问题：查询西部区域公司成都皇冠湖壹号本月权益后新增认购金额？
+问题：查询西部区域公司成都皇冠湖壹号本月新增认购金额？
 回答：
 {
-    "sql:"SELECT COUNT(1) AS 新增认购套数, SUM(archArea) AS 新增认购面积, SUM(subscramount) AS 权益前新增认购金额, SUM(subscramount * b.equityratio) AS 权益后新增签约金额 FROM fdc_dwd.dwd_trade_roomsubscr_a_min a LEFT JOIN fdc_ads.view_proj_equity_his b ON a.projcode = b.projcode AND a.subscrexecdate BETWEEN b.validdate AND b.invaliddate WHERE partitiondate = CURRENT_DATE AND subscrexecdate BETWEEN '2024-11-01' AND '2024-11-30' AND (subscrstatus = '激活' OR closereason = '转签约') AND a.cityname LIKE '%西部区域%' AND a.projname LIKE '%皇冠湖壹号%';"
+    "sql:"SELECT COUNT(1) AS 新增认购套数, SUM(archArea) AS 新增认购面积, SUM(subscramount * b.equityratio) AS 权益后新增签约金额 FROM fdc_dwd.dwd_trade_roomsubscr_a_min a LEFT JOIN fdc_ads.view_proj_equity_his b ON a.projcode = b.projcode AND a.subscrexecdate BETWEEN b.validdate AND b.invaliddate WHERE partitiondate = CURRENT_DATE AND subscrexecdate BETWEEN '2024-11-01' AND '2024-11-30' AND (subscrstatus = '激活' OR closereason = '转签约') AND a.cityname LIKE '%西部区域%' AND a.projname LIKE '%皇冠湖壹号%';"
 }

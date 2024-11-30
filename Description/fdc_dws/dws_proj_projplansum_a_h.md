@@ -9,7 +9,7 @@ fdc_dws.dws_proj_projplansum_a_h
 | ----------------------- | ------------------------------- | ------------------------- |
 | datadate                | character varying               | 数据日期                  |
 | citycode                | character varying               | 城市编码                  |
-| cityname                | character varying               | 城市名称                  |
+| cityname                | character varying               | 城市公司或区域公司名称       |
 | projcode                | character varying               | 项目编码                  |
 | projname                | character varying               | 项目名称                  |
 | m1plansignamount        | numeric                         | 1月计划签约金额           |

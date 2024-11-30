@@ -11,7 +11,7 @@ fdc_dws.dws_proj_room_totalsale_a_min
 | bucode                  | character  varying           | 事业部编码                |
 | buname                  | character  varying           | 事业部名称                |
 | citycode                | character  varying           | 城市编码                  |
-| cityname                | character  varying           | 城市名称                  |
+| cityname                | character  varying           | 城市公司或区域公司名称       |
 | projcode                | character  varying           | 项目编码                  |
 | projname                | character  varying           | 项目名称                  |
 | buildcode               | character  varying           | 楼栋编码                  |

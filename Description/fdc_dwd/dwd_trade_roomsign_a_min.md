@@ -21,7 +21,7 @@ fdc_dwd.dwd_trade_roomsign_a_min
 | formatfullnm         | character varying               | 业态全称                         |
 | formatname           | character varying               | 业态名称                         |
 | citycode             | character varying               | 城市公司编码                     |
-| cityname             | character varying               | 城市公司名称                     |
+| cityname             | character varying               | 城市公司或区域公司名称             |
 | corpcompanycode      | character varying               | 法人公司编码                     |
 | corpcompanyname      | character varying               | 法人公司名称                     |
 | propertyconsultantid | character varying               | 置业顾问编码                     |

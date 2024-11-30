@@ -23,7 +23,6 @@ left join
 where 
     b.statDate = '${startdate}';
 其中模板变量 ${startdate} 和 ${enddate} 被用来限定时间范围。
-5. 若用户提问中涉及组织名称或项目名称，请提取名称作为模糊匹配的筛选条件。组织名称可能包含城市名，应视为一个完整的字符串，不要拆分。如"成都皇冠湖壹号"可以通过 orgname LIKE "%皇冠湖壹号%" 进行模糊匹配。
 请严格按照计算规则的逻辑给出SQL代码，并按照以下JSON格式响应：
 {
     "sql": "SQL Query to run",
