@@ -59,7 +59,7 @@ def post_chat(query):
         print("Exception occurred:", str(e))
 
 
-#post_chat("同比增长是多少")
+post_chat("总的来访转换率是多少")
 # 1
 #post_chat("本月新增认购")
 #post_chat("其中西部公司是多少")

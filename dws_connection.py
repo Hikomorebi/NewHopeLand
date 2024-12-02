@@ -31,7 +31,16 @@ def dws_connect_test(sql_query):
 
 
 query = """
-SELECT custname, mobilephone, visitdate, projname FROM fdc_dwd.dwd_cust_custvisitflow_a_min WHERE projname LIKE '%成都%' AND partitiondate = current_date AND visitdate::timestamp >= date_trunc('month', current_date - interval '1 month') AND visitdate::timestamp < date_trunc('month', current_date) ORDER BY visitdate;
+SELECT 
+    SUM(首访客户数) AS 首访客户数总和
+FROM (
+    SELECT 
+        COUNT(DISTINCT CASE WHEN isvisit = '否' THEN saleruserId ELSE NULL END) AS 首访客户数
+    FROM fdc_dwd.dwd_cust_custvisitflow_a_min
+    WHERE partitiondate = CURRENT_DATE
+    AND left(visitDate, 10) = current_date
+    GROUP BY projname
+) AS proj_summary;
 """
 
 dws_connect_test(query)

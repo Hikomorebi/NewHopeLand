@@ -28,7 +28,7 @@
         "prompt":"SystemPrompts/visittosubratio.txt"
     },
     "首复访客户数":{
-        "chosen_tables":{"fdc_ads":["ads_salesreport_visitweekanalyse_a_min"]},
+        "chosen_tables":{"fdc_dwd":["dwd_cust_custvisitflow_a_min"]},
         "prompt":"SystemPrompts/visitornum.txt"
     }
 }

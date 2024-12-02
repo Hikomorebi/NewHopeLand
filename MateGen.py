@@ -184,7 +184,7 @@ class MateGen:
                 return chat_dict
             elif sql_exec_dict["status"] == 2:
                 chat_dict["status"] = 1
-                chat_dict["gpt_response"] = "针对该问题，查询结果为空。"
+                chat_dict["gpt_response"] = "您好，没有查询到相关数据，请换一种问法吧~"
                 self.messages.messages_append(
                     {
                         "role": "assistant",
