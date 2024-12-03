@@ -21,7 +21,11 @@
     },
     "认购金额":{
         "chosen_tables":{"fdc_dws":["dws_proj_room_totalsale_a_min"]},
-        "prompt":"SystemPrompts/subsign.txt"
+        "prompt":"SystemPrompts/subamount.txt"
+    },
+    "签约金额":{
+        "chosen_tables":{"fdc_dws":["dws_proj_room_totalsale_a_min"]},
+        "prompt":"SystemPrompts/signamount.txt"
     },
     "来访转化率":{
         "chosen_tables":{"fdc_ads":["ads_salesreport_visitweekanalyse_a_min"]},

@@ -31,18 +31,7 @@ def dws_connect_test(sql_query):
 
 
 query = """
-SELECT 
-    rt_c.sign_units - rt_b.sign_units AS signunits,
-    rt_c.sign_area - rt_b.sign_area AS signarea,
-    rt_c.sign_amt - rt_b.sign_amt AS signamount
-FROM 
-    fdc_dws.dws_proj_room_totalsale_a_min rt_c
-LEFT JOIN 
-    fdc_dws.dws_proj_room_totalsale_a_min rt_b
-    ON rt_c.datadate = '2024-12-01' 
-    AND rt_c.roomcode = rt_b.roomcode
-WHERE 
-    rt_b.datadate = current_date
+select rt_c.projname, sum(nvl(rt_c.sign_amt, 0) - nvl(rt_b.sign_amt, 0)) as signamount from fdc_dws.dws_proj_room_totalsale_a_min rt_c left join fdc_dws.dws_proj_room_totalsale_a_min rt_b on rt_c.datadate = '2024-10-07' and rt_c.roomcode = rt_b.roomcode where rt_b.datadate = '2024-10-01' group by rt_c.projname order by signamount desc limit 3
 """
 
 dws_connect_test(query)
