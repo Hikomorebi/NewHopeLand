@@ -351,11 +351,11 @@ def get_indicator_names(cursor):
     indicator_names = [row[0] for row in result if row[0] is not None]
     return indicator_names
 def get_indicator_data(cursor,indicator_name):
-    query = "SELECT NAME,FIELD_NAME,CALCULATION_RULES,DATA_SOURCE FROM NH_INDICATOR_MANAGEMENT WHERE `NAME` = %s"
+    query = "SELECT NAME,FIELD_NAME,CALCULATION_RULES,DATA_SOURCE,DATA_SOURCE_TABLE FROM NH_INDICATOR_MANAGEMENT WHERE `NAME` = %s"
     cursor.execute(query, (indicator_name,))
     result = cursor.fetchone()
     if result:
-        columns = ["指标名","指标字段名","计算规则","数据来源"]
+        columns = ["指标名","指标字段名","计算规则","数据来源","数据来源表"]
         result_dict = dict(zip(columns, result))
         #result_json = json.dumps(result_dict, ensure_ascii=False, indent=4, default=default_converter)
         return result_dict
@@ -748,14 +748,13 @@ def test_match(user_question):
     conn.close()
     return indicator_name
 
-def select_table_based_on_indicator(indicator_tables):
+def select_table_based_on_indicator(data_source,data_source_table):
     try:
-        table_str = indicator_tables.strip()
-        parts = table_str.split(".")
-        if len(parts) != 2:
+        data_source = data_source.strip()
+        if data_source == '公式' or '':
             return None
-        # 将数据库部分作为键，表名部分作为值
-        return {parts[0]: [parts[1]]}
+        data_source_table = data_source_table.strip()
+        return {data_source: [data_source_table]}
     except Exception as e:
         # 捕获任何异常，返回 None
         print(str(e))
@@ -768,7 +767,7 @@ def get_indicator_data_dictionary(indicator_tables):
             return None
         # 将数据库部分作为键，表名部分作为值
         return query_tables_description({parts[0]: [parts[1]]})
-    except Exception as e:
+    except Exception:
         # 捕获任何异常，返回 None
         return None
 

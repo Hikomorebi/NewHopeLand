@@ -31,7 +31,18 @@ def dws_connect_test(sql_query):
 
 
 query = """
-select rt_c.projname, sum(nvl(rt_c.sign_amt, 0) - nvl(rt_b.sign_amt, 0)) as signamount from fdc_dws.dws_proj_room_totalsale_a_min rt_c left join fdc_dws.dws_proj_room_totalsale_a_min rt_b on rt_c.datadate = current_date and rt_c.roomcode = rt_b.roomcode where rt_b.datadate = '2024-11-30' and rt_c.partitiondate = current_date and rt_c.cityname LIKE '%西部区域%' and rt_c.projname LIKE '%锦粼湖院%' group by rt_c.projname;
+SELECT 
+    rt_c.sign_units - rt_b.sign_units AS signunits,
+    rt_c.sign_area - rt_b.sign_area AS signarea,
+    rt_c.sign_amt - rt_b.sign_amt AS signamount
+FROM 
+    fdc_dws.dws_proj_room_totalsale_a_min rt_c
+LEFT JOIN 
+    fdc_dws.dws_proj_room_totalsale_a_min rt_b
+    ON rt_c.datadate = '2024-12-01' 
+    AND rt_c.roomcode = rt_b.roomcode
+WHERE 
+    rt_b.datadate = current_date
 """
 
 dws_connect_test(query)

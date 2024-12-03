@@ -176,7 +176,8 @@ def chat():
                     chosen_tables = indicator_prompt_dict[indicator_name]['chosen_tables']
                 else:
                     chosen_tables = select_table_based_on_indicator(
-                        process_user_input_dict["indicator_data"]["数据来源"]
+                        process_user_input_dict["indicator_data"]["数据来源"],
+                        process_user_input_dict["indicator_data"]["数据来源表"]
                     )
                 print(f"选择的表是：{chosen_tables}")
             if chosen_tables is None:
