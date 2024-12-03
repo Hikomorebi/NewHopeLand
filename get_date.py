@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 import os
-import requests
 from openai import OpenAI
 import json
 
@@ -15,7 +14,7 @@ client = OpenAI(
 model = 'qwen2.5-72b-instruct'
 
 # 调用通义千问 API
-def generate_model_suggestions_and_rank(prompt):
+def generate_model_date(prompt):
     try:
         response = client.chat.completions.create(
             model=model,
@@ -35,31 +34,35 @@ def generate_model_suggestions_and_rank(prompt):
         print(f"调用API时出错: {e}")
         return "{}"
 
+# 从文件中读取文本内容
+def read_file_content(file_path):
+    with open(file_path, 'r', encoding='utf-8') as file:
+        return file.read()
 
-# 放假安排 URL
-url = "https://www.gov.cn/zhengce/content/202310/content_6911527.htm"
-
-def get_holiday_period(query):
+def get_holiday_period(query, file_path):
     try:
-        # 获取网页内容
-        response = requests.get(url)
-        response.raise_for_status()  # 确保请求成功
+        # 读取文件内容
+        file_content = read_file_content(file_path)
+
         # 将网页内容作为 prompt 传递给大模型
         prompt = f'''请从下列提问中提取对应假日的开始日期和结束日期： {query} ；
-        参考下面的日期数据:\n\n{response.text}，
-        当涉及到上面的数据不包含的节假日时，用系统日历进行判断输出，
-        返回结果应包含且只能包含以下字段：
-        - "开始日期"
-        - "结束日期"
-        以严格的可直接处理的JSON字符串格式输出，不要包含其他内容。
-        '''
-        result = generate_model_suggestions_and_rank(prompt)
+            参考下面的日期数据:\n\n{file_content}，
+            当涉及到上面的数据不包含的节假日时，用系统日历进行判断输出，
+            返回结果应包含且只能包含以下字段：
+            - "开始日期"
+            - "结束日期"
+            以严格的可直接处理的JSON字符串格式输出，不要包含其他内容。
+            '''
+        result = generate_model_date(prompt)
         return result
-    except requests.RequestException as e:
-        # 如果请求失败，返回错误信息
-        return f"请求失败：{e}"
 
-# 示例查询
-query = "今年端午期间的认购金额"
-holiday_period = get_holiday_period(query)
-print(holiday_period)
+    except Exception as e:
+        print(f"处理文件时出错: {e}")
+        return "{}"
+
+if __name__ == "__main__":
+    # 示例查询
+    query = "2024年清明节的净利润是多少"
+    file_path = "Database/Date.txt"  # 文件的正确路径
+    holiday_period = get_holiday_period(query,file_path)
+    print(holiday_period)

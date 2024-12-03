@@ -12,7 +12,7 @@ left join
     and rt_c.roomcode = rt_b.roomcode
 where 
     rt_b.datadate = '${startdate}'
-    and rt_c.partitiondate = current_date
+    and rt_c.partitiondate = '${enddate}'
 group by 
     rt_c.projname;
 其中模板变量 ${startdate} 和 ${enddate} 被用来限定时间范围。
