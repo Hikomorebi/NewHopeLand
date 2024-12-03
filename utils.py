@@ -11,6 +11,7 @@ from openai import OpenAI
 import Levenshtein  # 使用 Levenshtein 库来计算字符串距离
 import time
 import csv
+import jieba
 
 # 设置环境变量（仅在当前脚本运行期间有效）
 os.environ["OPENAI_API_KEY"] = "sk-94987a750c924ae19693c9a9d7ea78f7"
@@ -420,6 +421,27 @@ def fuzzy_match_indicator(query, indicator_names):
 
     return final_matched_indicators[0] if final_matched_indicators else None
 
+def force_match_indicator(user_question, indicator_names):
+    matched_indicators = []
+
+    for indicator in indicator_names:
+        indicator_length = len(indicator)
+        matched = False
+
+        # 从窗口大小2开始，直到整个指标名称的长度
+        for window_size in range(2, indicator_length + 1):
+            # 滑动窗口
+            for i in range(indicator_length - window_size + 1):
+                window = indicator[i:i + window_size]
+                if window in user_question:
+                    matched = True
+                    break  # 找到匹配后跳出当前指标的窗口滑动
+            if matched:
+                matched_indicators.append(indicator)
+                break  # 匹配成功后跳出当前指标的窗口大小循环
+
+    return matched_indicators
+
 
 def get_synonyms(cursor):
     query = """  
@@ -504,6 +526,57 @@ def process_user_input(user_question):
             process_user_input_dict["user_question"] = user_question
             process_user_input_dict["indicator_name"] = "base"
             return process_user_input_dict
+
+# def force_matching(user_question):
+#     # status=1表示问题干预成功，2表示匹配到指标，3表示返回同义词解释后的语句
+#     process_user_input_dict = {}
+#     # 连接到Navicat(Mysql)数据库
+#     conn, cursor = connect_to_db()
+
+#     # 查询华菁数据库获取所有指标名，以列表形式返回
+#     indicator_names = get_indicator_names(cursor)
+
+#     indicator_name_force = force_match_indicator(user_question,indicator_names)
+
+#     indicator_name = indicator_name_force[0] if indicator_name_force else None
+
+#     if indicator_name:
+#         # 如果找到匹配的指标，返回匹配的指标
+#         indicator_data = get_indicator_data(cursor,indicator_name)
+#         cursor.close()
+#         conn.close()
+#         process_user_input_dict["status"] = 2
+#         if indicator_name in indicator_map:
+#             indicator_name = indicator_map[indicator_name]
+#         process_user_input_dict["indicator_name"] = indicator_name
+#         process_user_input_dict["indicator_data"] = indicator_data
+#         process_user_input_dict["user_question"] = user_question
+#         return process_user_input_dict
+#     else:
+#         process_user_input_dict["status"] = 3
+#         process_user_input_dict["user_question"] = user_question
+#         process_user_input_dict["indicator_name"] = "base"
+#         return process_user_input_dict
+
+def force_matching(user_question):
+    process_user_input_dict = {}
+    # 连接到Navicat(Mysql)数据库
+    conn, cursor = connect_to_db()
+
+    # 查询华菁数据库获取所有指标名，以列表形式返回
+    indicator_names = get_indicator_names(cursor)
+
+    indicator_name_force = force_match_indicator(user_question,indicator_names)
+
+    if indicator_name_force:
+        process_user_input_dict["status"] = 2
+        process_user_input_dict["indicator_names"] = indicator_name_force
+    else:
+        process_user_input_dict["status"] = 3
+        process_user_input_dict["indicator_names"] = "base"
+    cursor.close()
+    conn.close()
+    return process_user_input_dict
 
 def dws_connect(sql_query,key_fields=None,display_type="response_bar_chart"):
     # status : 0表示sql执行报错,1表示正常返回结果，2表示查询结果为空
@@ -702,6 +775,8 @@ def get_indicator_data_dictionary(indicator_tables):
 def dict_intersection(dict1, dict2):
     # 初始化结果字典
     result = {}
+    if dict1 is None:
+        return dict2
     
     # 遍历第一个字典的每个键
     for key in dict1:
@@ -715,8 +790,4 @@ def dict_intersection(dict1, dict2):
     
     return result
 if __name__ == "__main__":
-
-    #dws_connect_test("select subtosign_period/newvisittosub_num as subtosignavgcycle,subtosign_num as subtosignunits from fdc_ads.ads_salesreport_subscranalyse_a_min where statdate = current_date")
-    dws_connect("""SELECT question_name, select_sql  
-    FROM nh_problem_meddle  
-    WHERE enabled = 'ENABLE' AND DELETE_FLAG = 'NOT_DELETE'""")
+    pass

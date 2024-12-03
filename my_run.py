@@ -126,7 +126,7 @@ def chat():
 
         # 问题干预：status=1,preset_sql为sql语句，is_indicator指示是否为指标问数
         # 指标管理：status=2,indicator_name为指标名,indicator_data为指标描述
-        # 基础问数：status=3,user_question为用户问题
+        # 基础问数：status=3,user_question为用户问题，indicator_name为base
         # "indicator_name = 'base'"表示基础问数
         process_user_input_dict = process_user_input(query)
 
@@ -241,8 +241,10 @@ def chat():
         print("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
         print(f"第一阶段：对话准备（数据表选择）耗时: {elapsed_time:.4f} 秒")
 
+        # chat函数
         chat_dict = mategen.chat(process_user_input_dict)
 
+        
         chat_dict["time"] = f"\n第一阶段：对话准备（数据表选择）耗时: {elapsed_time:.4f} 秒" + chat_dict["time"]
         if "chosen_tables" not in chat_dict:
             if is_new:
