@@ -45,7 +45,7 @@ FROM
 问题：查询首访客户数？
 回答：
 {
-    "sql:"select count(distinct case when isvisit = '否' then saleruserId else null end) as 首访客户数, count(distinct case when isvisit = '是' then saleruserId else null end) as 复访客户数 from fdc_dwd.dwd_cust_custvisitflow_a_min where partitiondate = current_date and left(visitDate, 10) between '2024-12-01' and '2024-12-31';"
+    "sql":"select count(distinct case when isvisit = '否' then saleruserId else null end) as 首访客户数, count(distinct case when isvisit = '是' then saleruserId else null end) as 复访客户数 from fdc_dwd.dwd_cust_custvisitflow_a_min where partitiondate = current_date and left(visitDate, 10) between '2024-12-01' and '2024-12-31';"
 }
 
 问题：首访客户数环比增长率。

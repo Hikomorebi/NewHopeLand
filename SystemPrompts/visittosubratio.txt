@@ -32,5 +32,5 @@ where
 问题：查询2024年11月的来访转化率。
 回答：
 {
-    "sql:"select sum(nvl(c.newsubscrnum, 0) - nvl(b.newsubscrnum, 0)) as 新增认购, sum(nvl(c.visitornum, 0) - nvl(b.visitornum, 0)) as 新增来访, 新增认购 / NULLIF(新增来访,0) as 来访转化率 from fdc_ads.ads_salesreport_visitweekanalyse_a_min c left join fdc_ads.ads_salesreport_visitweekanalyse_a_min b on c.statDate = '2024-11-30' and c.orgname = b.orgname where b.statDate = '2024-10-31'"
+    "sql":"select sum(nvl(c.newsubscrnum, 0) - nvl(b.newsubscrnum, 0)) as 新增认购, sum(nvl(c.visitornum, 0) - nvl(b.visitornum, 0)) as 新增来访, 新增认购 / NULLIF(新增来访,0) as 来访转化率 from fdc_ads.ads_salesreport_visitweekanalyse_a_min c left join fdc_ads.ads_salesreport_visitweekanalyse_a_min b on c.statDate = '2024-11-30' and c.orgname = b.orgname where b.statDate = '2024-10-31'"
 }

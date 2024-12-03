@@ -27,5 +27,5 @@ from (
 问题：返回当月认购缺口。
 回答：
 {
-    "sql:"select nvl(a.plansignamount, 0) - nvl(b.subscramount, 0) as 认购缺口, a.plansignamount as 月度签约任务, b.subscramount as 月度新增认购金额 from (select sum(m12PlanSignAmount) plansignamount from fdc_dws.dws_proj_projplansum_a_h where partitiondate = current_date and years = 2024) a, (select sum(subscramount) as subscramount from fdc_dwd.dwd_trade_roomsubscr_a_min where partitiondate = current_date and subscrexecdate between '2024-12-01' and '2024-12-30' and (subscrstatus = '激活' or closereason = '转签约')) b;"
+    "sql":"select nvl(a.plansignamount, 0) - nvl(b.subscramount, 0) as 认购缺口, a.plansignamount as 月度签约任务, b.subscramount as 月度新增认购金额 from (select sum(m12PlanSignAmount) plansignamount from fdc_dws.dws_proj_projplansum_a_h where partitiondate = current_date and years = 2024) a, (select sum(subscramount) as subscramount from fdc_dwd.dwd_trade_roomsubscr_a_min where partitiondate = current_date and subscrexecdate between '2024-12-01' and '2024-12-30' and (subscrstatus = '激活' or closereason = '转签约')) b;"
 }
