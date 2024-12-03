@@ -1,22 +1,24 @@
 认签比和认签达成进度是两个需要计算的指标，默认按本月进行计算，其计算规则是
-select a.projname as 项目
-,b.subscramount/nullif(a.plansignamount, 0) as 认签比
-,nvl(b.subscramount/nullif(a.plansignamount, 0), 0) - EXTRACT(DAY FROM CURRENT_DATE)::FLOAT / EXTRACT(DAY FROM last_day(current_date)) 认签达成进度
-,EXTRACT(DAY FROM CURRENT_DATE)::FLOAT / EXTRACT(DAY FROM last_day(current_date)) 当月时间进度
+select 
+    a.projname as 项目, 
+    b.subscramount / nullif(a.plansignamount, 0) as 认签比, 
+    nvl(b.subscramount / nullif(a.plansignamount, 0), 0) - EXTRACT(DAY FROM CURRENT_DATE)::FLOAT / EXTRACT(DAY FROM last_day(current_date)) as 认签达成进度, 
+    EXTRACT(DAY FROM CURRENT_DATE)::FLOAT / EXTRACT(DAY FROM last_day(current_date)) as 当月时间进度
 from 
-(
-    select projname, projcode, ${month}PlanSignAmount as plansignamount
-    from fdc_dws.dws_proj_projplansum_a_h where partitiondate = current_date
-    and years = left(current_date, 4)
-) a
-left join
-(
-    select projcode, sum(subscramount) as subscramount
-    from fdc_dwd.dwd_trade_roomsubscr_a_min 
-    where partitiondate = current_date 
-    and subscrexecdate between date_trunc('month', current_date) and current_date and (subscrstatus = '激活' or closereason = '转签约')
-    group by 1
-) b on a.projcode = b.projcode;
+    (
+        select projname, projcode, ${month}PlanSignAmount as plansignamount 
+        from fdc_dws.dws_proj_projplansum_a_h 
+        where partitiondate = current_date and ${month}PlanSignAmount != 0 and years = left(current_date, 4)
+    ) a 
+join 
+    (
+        select projcode, sum(subscramount) as subscramount 
+        from fdc_dwd.dwd_trade_roomsubscr_a_min 
+        where partitiondate = current_date and subscrexecdate between date_trunc('month', current_date) and current_date and (subscrstatus = '激活' or closereason = '转签约') 
+        group by 1
+    ) b 
+on 
+    a.projcode = b.projcode;
 其中模板变量 ${month} 被用来动态生成查询条件，如果当前月份是1月，则 ${month} 会被替换为 m1，生成字段名 m1PlanSignAmount。
 你是一名数据库专家，请根据计算规则生成正确的PostgreSQL语句。要求如下：
 1. 请仔细阅读并理解用户的请求。参考数据库字典提供的表结构和各字段信息，根据计算规则生成正确的PostgreSQL语句。
@@ -32,5 +34,5 @@ left join
 示例：查询云镜项目认签比。
 回答：
 {
-    "sql:"select a.projname as 项目, b.subscramount/nullif(a.plansignamount, 0) as 认签比, nvl(b.subscramount/nullif(a.plansignamount, 0), 0) - EXTRACT(DAY FROM CURRENT_DATE)::FLOAT / EXTRACT(DAY FROM last_day(current_date)) 认签达成进度, EXTRACT(DAY FROM CURRENT_DATE)::FLOAT / EXTRACT(DAY FROM last_day(current_date)) 当月时间进度 from (select projname, projcode, m12PlanSignAmount as plansignamount from fdc_dws.dws_proj_projplansum_a_h where partitiondate = current_date and years = left(current_date, 4) and projname like '%云境%') a left join (select projcode, sum(subscramount) as subscramount from fdc_dwd.dwd_trade_roomsubscr_a_min where partitiondate = current_date and subscrexecdate between date_trunc('month', current_date) and current_date and (subscrstatus = '激活' or closereason = '转签约') group by 1) b on a.projcode = b.projcode;"
+    "sql:"select a.projname as 项目, b.subscramount / nullif(a.plansignamount, 0) as 认签比, nvl(b.subscramount / nullif(a.plansignamount, 0), 0) - EXTRACT(DAY FROM CURRENT_DATE)::FLOAT / EXTRACT(DAY FROM last_day(current_date)) as 认签达成进度, EXTRACT(DAY FROM CURRENT_DATE)::FLOAT / EXTRACT(DAY FROM last_day(current_date)) as 当月时间进度 from (select projname, projcode, m12PlanSignAmount as plansignamount from fdc_dws.dws_proj_projplansum_a_h where partitiondate = current_date and m12PlanSignAmount != 0 and years = left(current_date, 4) and projname like '%云境%') a join (select projcode, sum(subscramount) as subscramount from fdc_dwd.dwd_trade_roomsubscr_a_min where partitiondate = current_date and subscrexecdate between date_trunc('month', current_date) and current_date and (subscrstatus = '激活' or closereason = '转签约') group by 1) b on a.projcode = b.projcode"
 }

@@ -31,16 +31,7 @@ def dws_connect_test(sql_query):
 
 
 query = """
-SELECT 
-    SUM(首访客户数) AS 首访客户数总和
-FROM (
-    SELECT 
-        COUNT(DISTINCT CASE WHEN isvisit = '否' THEN saleruserId ELSE NULL END) AS 首访客户数
-    FROM fdc_dwd.dwd_cust_custvisitflow_a_min
-    WHERE partitiondate = CURRENT_DATE
-    AND left(visitDate, 10) = current_date
-    GROUP BY projname
-) AS proj_summary;
+select a.projname as 项目, b.subscramount / nullif(a.plansignamount, 0) as 认签比, nvl(b.subscramount / nullif(a.plansignamount, 0), 0) - EXTRACT(DAY FROM CURRENT_DATE)::FLOAT / EXTRACT(DAY FROM last_day(current_date)) as 认签达成进度, EXTRACT(DAY FROM CURRENT_DATE)::FLOAT / EXTRACT(DAY FROM last_day(current_date)) as 当月时间进度 from (select projname, projcode, m12PlanSignAmount as plansignamount from fdc_dws.dws_proj_projplansum_a_h where partitiondate = current_date and m12PlanSignAmount != 0 and years = left(current_date, 4) and projname like '%锦悦天曜%') a join (select projcode, sum(subscramount) as subscramount from fdc_dwd.dwd_trade_roomsubscr_a_min where partitiondate = current_date and subscrexecdate between date_trunc('month', current_date) and current_date and (subscrstatus = '激活' or closereason = '转签约') group by 1) b on a.projcode = b.projcode;
 """
 
 dws_connect_test(query)
