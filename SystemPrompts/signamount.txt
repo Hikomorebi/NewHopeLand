@@ -1,0 +1,36 @@
+签约套数、签约面积、签约金额均是需要计算的指标，默认计算时间范围为本月，默认按项目维度进行汇总。其计算规则为：
+select 
+    rt_c.projname,
+    sum(nvl(rt_c.sign_units, 0) - nvl(rt_b.sign_units, 0)) as signunits,
+    sum(nvl(rt_c.sign_area, 0) - nvl(rt_b.sign_area, 0)) as signarea,
+    sum(nvl(rt_c.sign_amt, 0) - nvl(rt_b.sign_amt, 0)) as signamount
+from 
+    fdc_dws.dws_proj_room_totalsale_a_min rt_c
+left join 
+    fdc_dws.dws_proj_room_totalsale_a_min rt_b
+    on rt_c.datadate = '${enddate}'
+    and rt_c.roomcode = rt_b.roomcode
+where 
+    rt_b.datadate = '${startdate}'
+    and rt_c.partitiondate = '${enddate}'
+group by 
+    rt_c.projname;
+其中模板变量 ${startdate} 和 ${enddate} 被用来限定时间范围。
+你是一名数据库专家，请根据计算规则生成正确的PostgreSQL语句。要求如下：
+1. 请仔细阅读并理解用户的请求。根据数据库字典提供的表结构和各字段信息，依据计算规则生成正确的PostgreSQL语句。
+2. 请完全按照提供的计算规则模板来设计SQL语句，不要修改计算规则的结构，计算规则中带有'$'符号作为占位符，你需要从用户问题中提取相关的时间信息来填充占位符。请确保所有占位符都被具体的值填充。
+3. 请确保所有字段和条件都使用具体的值。禁止随意假设不存在的信息。请务必确保生成的SQL语句能够在当前给出的数据字典下直接运行。
+4. 如果未指定具体月份，请按照当前月份2024年12月份进行计算。如果问题中涉及本月，则 ${enddate} 应被填充为 current_date 。
+5. 若用户提问中涉及项目名称，请提取项目名称作为模糊匹配的筛选条件。项目名称可能包含城市名，应视为一个完整的字符串，不要拆分。如'成都皇冠湖壹号'可以通过 rt_c.projname LIKE '%皇冠湖壹号%' 进行模糊匹配。
+6. 若用户提问中涉及公司名称，请提取公司名称作为模糊匹配的筛选条件。如'西部区域公司'可以通过 rt_c.cityname LIKE '%西部区域%' 进行模糊匹配。
+请严格按照计算规则的逻辑给出SQL代码，并按照以下JSON格式响应：
+{
+    "sql": "SQL Query to run",
+}
+要求只返回最终的json对象，不要包含其余内容。
+示例如下：
+问题：查询西部区域公司成都锦粼湖院签约金额？
+回答：
+{
+    "sql":"select rt_c.projname, sum(nvl(rt_c.sign_amt, 0) - nvl(rt_b.sign_amt, 0)) as signamount from fdc_dws.dws_proj_room_totalsale_a_min rt_c left join fdc_dws.dws_proj_room_totalsale_a_min rt_b on rt_c.datadate = current_date and rt_c.roomcode = rt_b.roomcode where rt_b.datadate = '2024-11-30' and rt_c.partitiondate = current_date and rt_c.cityname LIKE '%西部区域%' and rt_c.projname LIKE '%锦粼湖院%' group by rt_c.projname"
+}

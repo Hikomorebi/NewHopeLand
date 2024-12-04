@@ -3,7 +3,7 @@
 回答： 
 { 
 	"thoughts": "用户希望查询武汉锦粼九里项目2023年第一季度的总来访人数，并且需要展示首访和复访的相关数据。通过 visitornum（总来访）、newvisitornum（首访人数）和 revisitornum（复访人数）来获取这些信息。同时，使用 statdate 字段来筛选2023年第一季度的数据。", 
-	"sql": "SELECT SUM(visitornum) AS total_visitors, SUM(newvisitornum) AS new_visitors, SUM(revisitornum) AS repeat_visitors FROM ads_salesreport_visitweekanalyse_a_min WHERE orgname = '武汉锦粼九里' AND statdate >= '2023-01-01' AND statdate < '2023-04-01';",
-	"key_fields": ["total_visitors", "new_visitors", "repeat_visitors"],	
+	"sql": "SELECT SUM(visitornum) AS total_visitors, SUM(newvisitornum) AS new_visitors, SUM(revisitornum) AS repeat_visitors FROM fdc_ads.ads_salesreport_visitweekanalyse_a_min WHERE orgname = '武汉锦粼九里' AND statdate >= '2023-01-01' AND statdate < '2023-04-01';",
+	"key_fields": "total_visitors, new_visitors, repeat_visitors",	
 	"display_type": "response_bar_chart" 
 }

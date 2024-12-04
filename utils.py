@@ -11,10 +11,35 @@ from openai import OpenAI
 import Levenshtein  # 使用 Levenshtein 库来计算字符串距离
 import time
 import csv
+import jieba
+fuzzy_match_prompt = """
+在地产销售问数场景中，销售人员可能会针对一个指标进行提问，可能会涉及到的指标有{all_indicators}。
+现在销售人员进行提问，请仔细分析问题，如果问题涉及到某个指标，请返回该指标名。如果提问涉及多个可能的指标，也只需要回答一个指标名即可。如果问题不涉及任何指标，不要强行匹配指标，请返回'无关指标'。
+请严格按照以下JSON格式响应：
+{{
+    "indicator": "选择的指标名或无关指标",
+}}
+示例：
+user:查询本月认购情况。
+assistant:
+{{
+    "indicator":"认购金额"
+}}
+user:这个月哪位业务员的业绩最好？
+assistant:
+{{
+    "indicator":"无关指标"
+}}
+现在销售人员提问：
+user:{user_question}
+要求只返回最终的json对象，不要包含其余内容。
+"""
 
 # 设置环境变量（仅在当前脚本运行期间有效）
 os.environ["OPENAI_API_KEY"] = "sk-94987a750c924ae19693c9a9d7ea78f7"
 
+with open("indicator_map.json", "r", encoding="utf-8") as file:
+    indicator_map = json.load(file)
 with open("en2ch.json", "r", encoding="utf-8") as file:
     en2zh_json = json.load(file)
 
@@ -52,7 +77,7 @@ def get_sql_results_json(translated_column_names, type_codes, results, sql_query
     response_columns = []
     for i in range(len(translated_column_names)):
         # 如果是数值型
-        if type_codes[i] in [1700,701,23]:
+        if type_codes[i] in [1700,700,701,23,20]:
             numbers = [x for x in response_data[translated_column_names[i]] if x is not None]
             if numbers == []:
                 response_columns.append({"name":translated_column_names[i],"field_type":"指标","default_display":True if i in positions else False,"stats":{}})
@@ -323,7 +348,7 @@ def get_similarity(query1, query2):
 
 # 查询干预问题
 # 更新查询干预问题的函数以包括相似度匹配
-def get_intervention_sql(cursor, user_question, similarity_threshold=0.7):
+def get_intervention_sql(cursor, user_question, similarity_threshold=1.0):
     query = """  
     SELECT question_name, select_sql  
     FROM nh_problem_meddle  
@@ -344,12 +369,13 @@ def get_indicator_names(cursor):
     result = cursor.fetchall()
     indicator_names = [row[0] for row in result if row[0] is not None]
     return indicator_names
+
 def get_indicator_data(cursor,indicator_name):
-    query = "SELECT NAME,FIELD_NAME,CALCULATION_RULES,DATA_SOURCE FROM NH_INDICATOR_MANAGEMENT WHERE `NAME` = %s"
+    query = "SELECT NAME,FIELD_NAME,CALCULATION_RULES,DATA_SOURCE,DATA_SOURCE_TABLE FROM NH_INDICATOR_MANAGEMENT WHERE `NAME` = %s"
     cursor.execute(query, (indicator_name,))
     result = cursor.fetchone()
     if result:
-        columns = ["指标名","指标字段名","计算规则","数据来源"]
+        columns = ["指标名","指标字段名","计算规则","数据来源","数据来源表"]
         result_dict = dict(zip(columns, result))
         #result_json = json.dumps(result_dict, ensure_ascii=False, indent=4, default=default_converter)
         return result_dict
@@ -384,12 +410,7 @@ def fuzzy_match_indicator(query, indicator_names):
 
     # 构建模型提示
     indicator_names_str = "\n".join([f"- {indicator}" for indicator in indicator_names])
-    prompt = (
-        f"请从以下基础指标中提取出用户问题中提到的指标：\n"
-        f"{indicator_names_str}\n"
-        f"用户问题是：'{query}'\n"
-        f"请仔细分析用户的问题，如果问题涉及基础指标，请返回匹配到的基础指标名称的列表，以逗号分隔。如果用户的问题不涉及基础指标，不要强行匹配指标，请返回'无关指标'。"
-    )
+    prompt = fuzzy_match_prompt.format(all_indicators=indicator_names_str,user_question=query).strip()
 
     # 调用大模型API进行模糊匹配
     response = client.chat.completions.create(
@@ -397,23 +418,53 @@ def fuzzy_match_indicator(query, indicator_names):
     )
 
     # 解析响应并获取匹配的指标
-    matched_indicators = response.choices[0].message.content.strip()
-    if matched_indicators == "无关指标":
+    response_content = response.choices[0].message.content.strip()
+    json_pattern = r'\{[\s\S]*?\}'
+    match = re.search(json_pattern, response_content)
+
+    if match:
+        # 提取到JSON字符串
+        json_str = match.group(0)
+        
+        # 将JSON字符串转换为字典
+        try:
+            output_dict = json.loads(json_str)
+            indicator = output_dict.get('indicator', '无关指标')
+            print(indicator)
+        except json.JSONDecodeError:
+            print('无法解析JSON')
+            return None
+    else:
+        print('未找到JSON对象')
+        return None
+    if indicator == "无关指标":
         return None
 
-    if matched_indicators:
-        matched_indicators_list = [
-            indicator.strip() for indicator in matched_indicators.split(",")
-        ]
+    if indicator in indicator_names:
+        return indicator
     else:
-        matched_indicators_list = []
+        return None
 
-    # 过滤基础指标中的有效匹配项
-    final_matched_indicators = [
-        indicator for indicator in indicator_names if indicator in matched_indicators_list
-    ]
+def force_match_indicator(user_question, indicator_names):
+    matched_indicators = []
 
-    return final_matched_indicators[0] if final_matched_indicators else None
+    for indicator in indicator_names:
+        indicator_length = len(indicator)
+        matched = False
+
+        # 从窗口大小2开始，直到整个指标名称的长度
+        for window_size in range(2, indicator_length + 1):
+            # 滑动窗口
+            for i in range(indicator_length - window_size + 1):
+                window = indicator[i:i + window_size]
+                if window in user_question:
+                    matched = True
+                    break  # 找到匹配后跳出当前指标的窗口滑动
+            if matched:
+                matched_indicators.append(indicator)
+                break  # 匹配成功后跳出当前指标的窗口大小循环
+
+    return matched_indicators
 
 
 def get_synonyms(cursor):
@@ -423,7 +474,8 @@ def get_synonyms(cursor):
     WHERE ENABLED = 'ENABLE' AND DELETE_FLAG = 'NOT_DELETE'
     """
     cursor.execute(query)
-    return {row[0]: row[1] for row in cursor.fetchall()}
+    # return {row[0]: row[1] for row in cursor.fetchall()}
+    return {row[0]: row[1] for row in cursor.fetchall() if row[0] is not None and row[1] is not None}
 
 
 # 替换同义词
@@ -447,16 +499,14 @@ def process_user_input(user_question):
         print(f"Modified question: {user_question}")
 
     # 查询干预问题对应的SQL语句
-    preset_sql = get_intervention_sql(cursor, user_question)
+    preset_sql = get_intervention_sql(cursor, user_question,similarity_threshold=1.0)
 
     if preset_sql:
         # 如果找到干预问题，返回预设的SQL语句
         print(f"Intervention found: {preset_sql}")
-        # 关闭数据库连接
 
         process_user_input_dict["status"] = 1
         process_user_input_dict["preset_sql"] = preset_sql
-        process_user_input_dict["is_indicator"] = False
 
         indicator_names = get_indicator_names(cursor)
 
@@ -464,14 +514,17 @@ def process_user_input(user_question):
 
         if indicator_name:
             # 如果找到匹配的指标，返回匹配的指标
-            # 关闭数据库连接
             indicator_data = get_indicator_data(cursor,indicator_name)
-            process_user_input_dict["is_indicator"] = True
+            if indicator_name in indicator_map:
+                indicator_name = indicator_map[indicator_name]
             process_user_input_dict["indicator_name"] = indicator_name
             process_user_input_dict["indicator_data"] = indicator_data
+        else:
+            process_user_input_dict["indicator_name"] = "base"
             
         cursor.close()
         conn.close()
+        process_user_input_dict["user_question"] = user_question
         return process_user_input_dict
     else:
         # 如果没有找到干预问题，进行指标匹配
@@ -482,18 +535,72 @@ def process_user_input(user_question):
 
         if indicator_name:
             # 如果找到匹配的指标，返回匹配的指标
-            # 关闭数据库连接
             indicator_data = get_indicator_data(cursor,indicator_name)
             cursor.close()
             conn.close()
             process_user_input_dict["status"] = 2
+            if indicator_name in indicator_map:
+                indicator_name = indicator_map[indicator_name]
             process_user_input_dict["indicator_name"] = indicator_name
             process_user_input_dict["indicator_data"] = indicator_data
+            process_user_input_dict["user_question"] = user_question
             return process_user_input_dict
         else:
             process_user_input_dict["status"] = 3
             process_user_input_dict["user_question"] = user_question
+            process_user_input_dict["indicator_name"] = "base"
             return process_user_input_dict
+
+# def force_matching(user_question):
+#     # status=1表示问题干预成功，2表示匹配到指标，3表示返回同义词解释后的语句
+#     process_user_input_dict = {}
+#     # 连接到Navicat(Mysql)数据库
+#     conn, cursor = connect_to_db()
+
+#     # 查询华菁数据库获取所有指标名，以列表形式返回
+#     indicator_names = get_indicator_names(cursor)
+
+#     indicator_name_force = force_match_indicator(user_question,indicator_names)
+
+#     indicator_name = indicator_name_force[0] if indicator_name_force else None
+
+#     if indicator_name:
+#         # 如果找到匹配的指标，返回匹配的指标
+#         indicator_data = get_indicator_data(cursor,indicator_name)
+#         cursor.close()
+#         conn.close()
+#         process_user_input_dict["status"] = 2
+#         if indicator_name in indicator_map:
+#             indicator_name = indicator_map[indicator_name]
+#         process_user_input_dict["indicator_name"] = indicator_name
+#         process_user_input_dict["indicator_data"] = indicator_data
+#         process_user_input_dict["user_question"] = user_question
+#         return process_user_input_dict
+#     else:
+#         process_user_input_dict["status"] = 3
+#         process_user_input_dict["user_question"] = user_question
+#         process_user_input_dict["indicator_name"] = "base"
+#         return process_user_input_dict
+
+def force_matching(user_question):
+    process_user_input_dict = {}
+    # 连接到Navicat(Mysql)数据库
+    conn, cursor = connect_to_db()
+
+    # 查询华菁数据库获取所有指标名，以列表形式返回
+    indicator_names = get_indicator_names(cursor)
+
+    indicator_name_force = force_match_indicator(user_question,indicator_names)
+
+    if indicator_name_force:
+        process_user_input_dict["status"] = 2
+        process_user_input_dict["indicator_names"] = indicator_name_force
+    else:
+        process_user_input_dict["status"] = 3
+        process_user_input_dict["indicator_names"] = "base"
+    cursor.close()
+    conn.close()
+    return process_user_input_dict
 
 def dws_connect(sql_query,key_fields=None,display_type="response_bar_chart"):
     # status : 0表示sql执行报错,1表示正常返回结果，2表示查询结果为空
@@ -514,6 +621,11 @@ def dws_connect(sql_query,key_fields=None,display_type="response_bar_chart"):
             cursor.execute(sql_query)
 
             results = cursor.fetchall()
+            length_pre = len(results)
+            results = [row for row in results if None not in row]
+            results_length = len(results)
+            if length_pre - results_length != 0:
+                print(f"{length_pre} 删空后为 {results_length}")
             end_time = time.time()
             elapsed_time = end_time - start_time
             print(f"查询耗时{elapsed_time}秒")
@@ -525,7 +637,7 @@ def dws_connect(sql_query,key_fields=None,display_type="response_bar_chart"):
                 key_field_words = [word.strip() for word in key_fields.split(',')]
                 positions = {i for i, word in enumerate(column_names) if word in key_field_words}
 
-            results_length = len(results)
+            
             if results_length > 100:
                 results = results[:100]
                 results_length = 100
@@ -548,6 +660,7 @@ def dws_connect(sql_query,key_fields=None,display_type="response_bar_chart"):
             dws_connect_dict["translated"] = translated_column_names
             sql_results_json = get_sql_results_json(translated_column_names, type_codes, results, sql_query, results_length, positions, display_type)
             dws_connect_dict["status"] = 1
+            dws_connect_dict["column_names"] = list(column_names)
             dws_connect_dict["sql_results_json"] = sql_results_json
     except Exception as e:
         traceback.print_exc()
@@ -562,32 +675,6 @@ def dws_connect(sql_query,key_fields=None,display_type="response_bar_chart"):
         connection.close()
 
     return dws_connect_dict
-
-def dws_connect_test(sql_query):
-    connection = psycopg2.connect(
-        dbname="fdc_dc",
-        user="dws_user_hwai",
-        password="NewHope#1982@",
-        host="124.70.57.67",
-        port="8000",
-    )
-    connection.set_client_encoding('UTF8')
-    print("连接成功")
-
-    try:
-        with connection.cursor() as cursor:
-            start_time = time.time()
-            cursor.execute(sql_query)
-
-            results = cursor.fetchall()
-            end_time = time.time()
-            elapsed_time = end_time - start_time
-            print(f"查询耗时{elapsed_time}秒")
-            print(results)
-    except Exception as e:
-        print(str(e))
-    finally:
-        connection.close()
 
 def extract_json_fields(input_string):
     # Use regex to find potential JSON parts in the input string
@@ -689,14 +776,14 @@ def test_match(user_question):
     cursor.close()
     conn.close()
     return indicator_name
-def select_table_based_on_indicator(indicator_tables):
+
+def select_table_based_on_indicator(data_source,data_source_table):
     try:
-        table_str = indicator_tables.strip()
-        parts = table_str.split(".")
-        if len(parts) != 2:
+        data_source = data_source.strip()
+        if data_source == '公式' or '':
             return None
-        # 将数据库部分作为键，表名部分作为值
-        return {parts[0]: [parts[1]]}
+        data_source_table = data_source_table.strip()
+        return {data_source: [data_source_table]}
     except Exception as e:
         # 捕获任何异常，返回 None
         print(str(e))
@@ -709,13 +796,15 @@ def get_indicator_data_dictionary(indicator_tables):
             return None
         # 将数据库部分作为键，表名部分作为值
         return query_tables_description({parts[0]: [parts[1]]})
-    except Exception as e:
+    except Exception:
         # 捕获任何异常，返回 None
         return None
 
 def dict_intersection(dict1, dict2):
     # 初始化结果字典
     result = {}
+    if dict1 is None:
+        return dict2
     
     # 遍历第一个字典的每个键
     for key in dict1:
@@ -729,6 +818,4 @@ def dict_intersection(dict1, dict2):
     
     return result
 if __name__ == "__main__":
-
-    #dws_connect_test("select subtosign_period/newvisittosub_num as subtosignavgcycle,subtosign_num as subtosignunits from fdc_ads.ads_salesreport_subscranalyse_a_min where statdate = current_date")
-    dws_connect("""SELECT SUM(subscramount) AS 新增认购金额, COUNT(1) AS 新增认购套数 FROM fdc_dwd.dwd_trade_roomsubscr_a_min WHERE partitiondate = current_date AND subscrexecdate BETWEEN '2024-10-01' AND '2024-10-07' AND (subscrstatus = '激活' OR closereason = '转签约') AND projname = '锦达到麟湖院' HAVING COUNT(1) > 0""")
+    pass

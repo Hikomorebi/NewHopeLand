@@ -11,6 +11,7 @@ from utils import (
     process_user_input,
     dws_connect,
     get_indicator_data_dictionary,
+    force_matching
 )
 import json
 
@@ -93,6 +94,8 @@ class MateGen:
         model="gpt-3.5-turbo",
         system_content_list=[],
         tokens_thr=150000,
+        current_indicator=None,
+        current_count=0
     ):
         self.client = OpenAI(
             api_key=api_key if api_key else os.getenv("OPENAI_API_KEY"),
@@ -106,15 +109,15 @@ class MateGen:
         self.messages = ChatMessages(
             system_content_list=self.system_content_list, tokens_thr=self.tokens_thr
         )
+        self.current_indicator = current_indicator
+        self.current_count = current_count
 
-    def chat(self, question=None,process_user_input_dict=None):
+    def chat(self, process_user_input_dict=None):
         # status:0表示大模型调用失败，1表示无需生成SQL语句，2表示生成SQL错误，3表示成功生成SQL语句
         chat_dict = {"time":"\n"}
-        if question is not None:
-            if process_user_input_dict['status'] == 3:
-                user_message = {"role": "user", "content": process_user_input_dict['user_question']}
-            else:
-                user_message = {"role": "user", "content": question}
+        if process_user_input_dict is not None:
+            question = process_user_input_dict['user_question']
+            user_message = {"role": "user", "content": question}
             self.messages.messages_append(user_message)
             before_get_sql = time.time()
             if process_user_input_dict["status"] == 1:
@@ -171,18 +174,43 @@ class MateGen:
             chat_dict["time"]+=f"第三阶段：查询dws数据库并制作sql_response耗时: {elapsed_time_dws:.4f} 秒\n"
             
             if sql_exec_dict["status"] == 0:
-                chat_dict["status"] = 2
-                chat_dict["sql_error_message"] = sql_exec_dict["error_message"]
-                self.messages.messages_append(
-                    {
-                        "role": "assistant",
-                        "content": "针对当前问题无法为您生成可用的查询。",
-                    }
-                )
-                return chat_dict
+                if process_user_input_dict['indicator_name'] == 'base':
+                    # 当sql执行报错且为基础问数时，强行匹配一个指标
+                    dict_force = force_matching(process_user_input_dict['user_question'])
+                    # 3 表示仍然没有匹配上指标
+                    if dict_force['status'] == 3:
+                        chat_dict["status"] = 2
+                        chat_dict["sql_error_message"] = sql_exec_dict["error_message"]
+                        self.messages.messages_append(
+                            {
+                                "role": "assistant",
+                                "content": "针对当前问题无法为您生成可用的查询。",
+                            }
+                        )
+                        return chat_dict
+                    elif dict_force['status'] == 2:
+                        chat_dict["status"] = 1
+                        chat_dict["gpt_response"] = f"你是想问以下指标中的某一个吗：{'，'.join(dict_force['indicator_names'])}，请选择你想要提问的指标重新提问。"
+                        self.messages.messages_append(
+                            {
+                                "role": "assistant",
+                                "content": "针对当前问题无法为您生成可用的查询。",
+                            }
+                        )
+
+                else:
+                    chat_dict["status"] = 2
+                    chat_dict["sql_error_message"] = sql_exec_dict["error_message"]
+                    self.messages.messages_append(
+                        {
+                            "role": "assistant",
+                            "content": "针对当前问题无法为您生成可用的查询。",
+                        }
+                    )
+                    return chat_dict
             elif sql_exec_dict["status"] == 2:
                 chat_dict["status"] = 1
-                chat_dict["gpt_response"] = "针对该问题，查询结果为空。"
+                chat_dict["gpt_response"] = "你好，没有查询到相关数据，请换一种问法"
                 self.messages.messages_append(
                     {
                         "role": "assistant",
@@ -198,12 +226,12 @@ class MateGen:
                     1. 不要包含具体的数值、数量、或内容，例如数字、列表中的项目、统计值等。
                     2. 仅需生成一段简短的描述，概括SQL查询结果的意义或范围，不要假设查询结果的具体细节。
                     3. 回答内容应完全基于用户问题的内容。
-                    示例：
-                    问题：请列出2024年8月提交的所有订单。
-                    回答：这里展示了2024年8月提交的所有订单。
-
-                    问题：查询南京天悦锦麟项目的所有客户名称和合同金额。
-                    回答：以下内容展示了南京天悦锦麟项目中所有客户的名称和合同金额。""",
+                    如下展示两个问答示例：
+                    user：请列出2024年8月提交的所有订单。
+                    assiatant：这里展示了2024年8月提交的所有订单。
+                    user：查询南京天悦锦麟项目的所有客户名称和合同金额。
+                    assistant：以下内容展示了南京天悦锦麟项目中所有客户的名称和合同金额。
+                    """,
                 }
             else:
                 
@@ -225,6 +253,7 @@ class MateGen:
             chat_dict["status"] = 3
             chat_dict["sql_results_json"] = sql_exec_dict["sql_results_json"]
             chat_dict["sql_code"] = sql_code
+            chat_dict["column_names"] = sql_exec_dict["column_names"]
             response_message_stream = get_gpt_response_stream(
                 self.client, self.model, copy_messages
             )

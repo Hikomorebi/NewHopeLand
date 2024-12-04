@@ -2,16 +2,14 @@
 fdc_dws.dws_proj_projplansum_a_h
 
 - 数据表解释
-
-项目计划汇总表。查询该数据表时，请务必使用 partitiondate 筛选分区时期，若无特别说明，使用 partitiondate = current_date进行筛选。
+项目计划汇总表。
 
 - 各字段说明
-
 | 字段名                  | 数据类型                        | 描述                      |
 | ----------------------- | ------------------------------- | ------------------------- |
 | datadate                | character varying               | 数据日期                  |
 | citycode                | character varying               | 城市编码                  |
-| cityname                | character varying               | 城市名称                  |
+| cityname                | character varying               | 城市公司或区域公司名称       |
 | projcode                | character varying               | 项目编码                  |
 | projname                | character varying               | 项目名称                  |
 | m1plansignamount        | numeric                         | 1月计划签约金额           |
@@ -119,3 +117,9 @@ fdc_dws.dws_proj_projplansum_a_h
 | q3planrefund_qyh        | numeric                         | 三季度计划回款金额_权益后 |
 | q4planrefund_qyh        | numeric                         | 四季度计划回款金额_权益后 |
 | yearplanrefund_qyh      | numeric                         | 年度计划回款金额_权益后   |
+
+- 查询须知
+1. 其中 cityname 代表城市公司或者区域公司的名称，如“西部区域公司”，“华东公司”，“成都公司”。若用户提问中涉及公司名称，请提取城市或区域名作为模糊匹配的筛选条件。如“西部区域公司”可以通过 cityname LIKE '%西部区域%' 进行模糊匹配，“成都公司”可以通过 cityname LIKE '%成都%' 进行匹配。
+2. 其中 projname 表示项目名称，由城市名和项目名组成，如“成都锦麟府”,若用户提问中包含城市名或项目名，请提取城市名或项目名作为模糊匹配的筛选条件。如“成都”可以通过 projname LIKE '%成都%' 进行模糊匹配，“锦麟府”可以通过 projname LIKE '%锦麟府%' 进行模糊匹配。
+3. 查询该表时，请务必使用 partitiondate = current_date 筛选分区时期。
+4. citycode 和 projcode 字段主要用于查询时的比较条件，而不用于显示，查询时，避免选择 citycode 和 projcode 字段。

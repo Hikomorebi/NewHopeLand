@@ -18,7 +18,7 @@ and left(visitdate, 10) between '${startdate}' and '${enddate}';
 1. 请仔细阅读并理解用户的请求。参考数据库字典提供的表结构和各字段信息，根据计算规则生成正确的PostgreSQL语句。
 2. 请完全按照提供的计算规则模板来设计SQL语句，不要修改计算规则的结构，计算规则中带有'$'符号作为占位符，需要从用户问题中提取相关的时间等信息来填充占位符。请确保所有占位符都被具体的值填充。
 3. 请确保所有字段和条件都使用具体的值。禁止随意假设不存在的信息。请务必确保生成的SQL语句能够直接运行。
-4. 如果未指定具体月份，请按照当前月份2024年11月份进行计算。
+4. 如果未指定具体月份，请按照当前月份2024年12月份进行计算。
 5. 若用户提问中涉及项目名称，请用 projname 字段进行筛选。请提取项目名称作为模糊匹配的筛选条件。如"成都皇冠湖壹号"可以通过 projname LIKE "%皇冠湖壹号%" 进行模糊匹配。
 请严格按照计算规则的逻辑给出SQL代码，并按照以下JSON格式响应：
 {
@@ -29,5 +29,5 @@ and left(visitdate, 10) between '${startdate}' and '${enddate}';
 问题：2024年国庆期间的来访组数是多少？
 回答：
 {
-    "sql:"with visitflow as (select projcode, projname, saleruserid, isvisit as isrevisit, visitdate, min(visitdate) over(partition by saleruserid, isvisit) min_visitdate from fdc_dwd.dwd_cust_custvisitflow_a_min where partitiondate = current_date) select count(distinct case when isrevisit = '否' then saleruserid else null end) + count(distinct case when isrevisit = '是' then saleruserid else null end) as 来访组数 from visitflow a where (isrevisit = '是' or visitdate = min_visitdate) and left(visitdate, 10) between '2024-10-01' and '2024-10-07';"
+    "sql":"with visitflow as (select projcode, projname, saleruserid, isvisit as isrevisit, visitdate, min(visitdate) over(partition by saleruserid, isvisit) min_visitdate from fdc_dwd.dwd_cust_custvisitflow_a_min where partitiondate = current_date) select count(distinct case when isrevisit = '否' then saleruserid else null end) + count(distinct case when isrevisit = '是' then saleruserid else null end) as 来访组数 from visitflow a where (isrevisit = '是' or visitdate = min_visitdate) and left(visitdate, 10) between '2024-10-01' and '2024-10-07';"
 }

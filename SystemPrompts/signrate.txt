@@ -29,7 +29,7 @@ from
 1. 请仔细阅读并理解用户的请求。参考数据库字典提供的表结构和各字段信息，根据计算规则生成正确的PostgreSQL语句。
 2. 请完全按照提供的计算规则模板来设计SQL语句，不要修改计算规则的结构，计算规则中带有'$'符号作为占位符，你需要从用户问题中提取相关的时间等信息来填充占位符。请确保所有占位符都被具体的值填充。
 3. 请确保所有字段和条件都使用具体的值。禁止随意假设不存在的信息。请务必确保生成的SQL语句能够直接运行。
-4. 如果未指定具体月份，请按照当前月份2024年11月份进行计算。
+4. 如果未指定具体月份，请按照当前月份2024年12月份进行计算。
 请严格按照计算规则的逻辑给出SQL代码，并按照以下JSON格式响应：
 {
     "sql": "SQL Query to run",
@@ -38,5 +38,5 @@ from
 示例：查询2024年一月份的签约达成率。
 回答：
 {
-    "sql:"SELECT cm_signamount / NULLIF(cm_plansignamount, 0) AS 一月签约达成率, cm_signamount AS 一月签约金额, cm_plansignamount AS 一月计划签约金额, cq_signamount / NULLIF(cq_plansignamount, 0) AS 一季度签约达成率, cy_signamount / NULLIF(cy_plansignamount, 0) AS 二零二四年签约达成率 FROM (SELECT SUM(m1PlanSignAmount) AS cm_plansignamount, SUM(q1PlanSignAmount) AS cq_plansignamount, SUM(yearPlanSignAmount) AS cy_plansignamount FROM fdc_dws.dws_proj_projplansum_a_h WHERE partitiondate = CURRENT_DATE AND years = '2024') a, (SELECT SUM(CASE WHEN signdate BETWEEN DATE_TRUNC('month', DATE '2024-01-01') AND DATE '2024-01-31' THEN contrTotalprice ELSE NULL END) AS cm_signamount, SUM(CASE WHEN signdate BETWEEN DATE_TRUNC('quarter', DATE '2024-01-01') AND DATE '2024-01-31' THEN contrTotalprice ELSE NULL END) AS cq_signamount, SUM(CASE WHEN signdate BETWEEN DATE_TRUNC('year', DATE '2024-01-01') AND DATE '2024-01-31' THEN contrTotalprice ELSE NULL END) AS cy_signamount FROM (SELECT signexecdate AS signdate, NVL(contrtotalprice, 0) + NVL(firstdecoraterenosum, 0) + (CASE WHEN fitmentpriceiscontr = '0' THEN NVL(decoratetotalprice, 0) ELSE 0 END) AS contrtotalprice FROM fdc_dwd.dwd_trade_roomsign_a_min WHERE partitiondate = CURRENT_DATE AND closedate > '2024-01-31')) b;"
+    "sql":"SELECT cm_signamount / NULLIF(cm_plansignamount, 0) AS 一月签约达成率, cm_signamount AS 一月签约金额, cm_plansignamount AS 一月计划签约金额, cq_signamount / NULLIF(cq_plansignamount, 0) AS 一季度签约达成率, cy_signamount / NULLIF(cy_plansignamount, 0) AS 二零二四年签约达成率 FROM (SELECT SUM(m1PlanSignAmount) AS cm_plansignamount, SUM(q1PlanSignAmount) AS cq_plansignamount, SUM(yearPlanSignAmount) AS cy_plansignamount FROM fdc_dws.dws_proj_projplansum_a_h WHERE partitiondate = CURRENT_DATE AND years = '2024') a, (SELECT SUM(CASE WHEN signdate BETWEEN DATE_TRUNC('month', DATE '2024-01-01') AND DATE '2024-01-31' THEN contrTotalprice ELSE NULL END) AS cm_signamount, SUM(CASE WHEN signdate BETWEEN DATE_TRUNC('quarter', DATE '2024-01-01') AND DATE '2024-01-31' THEN contrTotalprice ELSE NULL END) AS cq_signamount, SUM(CASE WHEN signdate BETWEEN DATE_TRUNC('year', DATE '2024-01-01') AND DATE '2024-01-31' THEN contrTotalprice ELSE NULL END) AS cy_signamount FROM (SELECT signexecdate AS signdate, NVL(contrtotalprice, 0) + NVL(firstdecoraterenosum, 0) + (CASE WHEN fitmentpriceiscontr = '0' THEN NVL(decoratetotalprice, 0) ELSE 0 END) AS contrtotalprice FROM fdc_dwd.dwd_trade_roomsign_a_min WHERE partitiondate = CURRENT_DATE AND closedate > '2024-01-31')) b;"
 }
