@@ -12,6 +12,28 @@ import Levenshtein  # 使用 Levenshtein 库来计算字符串距离
 import time
 import csv
 import jieba
+fuzzy_match_prompt = """
+在地产销售问数场景中，销售人员可能会针对一个指标进行提问，可能会涉及到的指标有{all_indicators}。
+现在销售人员进行提问，请仔细分析问题，如果问题涉及到某个指标，请返回该指标名。如果提问涉及多个可能的指标，也只需要回答一个指标名即可。如果问题不涉及任何指标，不要强行匹配指标，请返回'无关指标'。
+请严格按照以下JSON格式响应：
+{{
+    "indicator": "选择的指标名或无关指标",
+}}
+示例：
+user:查询本月认购情况。
+assistant:
+{{
+    "indicator":"认购金额"
+}}
+user:这个月哪位业务员的业绩最好？
+assistant:
+{{
+    "indicator":"无关指标"
+}}
+现在销售人员提问：
+user:{user_question}
+要求只返回最终的json对象，不要包含其余内容。
+"""
 
 # 设置环境变量（仅在当前脚本运行期间有效）
 os.environ["OPENAI_API_KEY"] = "sk-94987a750c924ae19693c9a9d7ea78f7"
@@ -350,6 +372,7 @@ def get_indicator_names(cursor):
     result = cursor.fetchall()
     indicator_names = [row[0] for row in result if row[0] is not None]
     return indicator_names
+
 def get_indicator_data(cursor,indicator_name):
     query = "SELECT NAME,FIELD_NAME,CALCULATION_RULES,DATA_SOURCE,DATA_SOURCE_TABLE FROM NH_INDICATOR_MANAGEMENT WHERE `NAME` = %s"
     cursor.execute(query, (indicator_name,))
@@ -390,12 +413,7 @@ def fuzzy_match_indicator(query, indicator_names):
 
     # 构建模型提示
     indicator_names_str = "\n".join([f"- {indicator}" for indicator in indicator_names])
-    prompt = (
-        f"请从以下基础指标中提取出用户问题中提到的指标：\n"
-        f"{indicator_names_str}\n"
-        f"用户问题是：'{query}'\n"
-        f"请仔细分析用户的问题，如果问题涉及基础指标，请返回匹配到的基础指标名称的列表，以逗号分隔。如果用户的问题不涉及基础指标，不要强行匹配指标，请返回'无关指标'。"
-    )
+    prompt = fuzzy_match_prompt.format(all_indicators=indicator_names_str,user_question=query).strip()
 
     # 调用大模型API进行模糊匹配
     response = client.chat.completions.create(
@@ -403,23 +421,32 @@ def fuzzy_match_indicator(query, indicator_names):
     )
 
     # 解析响应并获取匹配的指标
-    matched_indicators = response.choices[0].message.content.strip()
-    if matched_indicators == "无关指标":
+    response_content = response.choices[0].message.content.strip()
+    json_pattern = r'\{[\s\S]*?\}'
+    match = re.search(json_pattern, response_content)
+
+    if match:
+        # 提取到JSON字符串
+        json_str = match.group(0)
+        
+        # 将JSON字符串转换为字典
+        try:
+            output_dict = json.loads(json_str)
+            indicator = output_dict.get('indicator', '无关指标')
+            print(indicator)
+        except json.JSONDecodeError:
+            print('无法解析JSON')
+            return None
+    else:
+        print('未找到JSON对象')
+        return None
+    if indicator == "无关指标":
         return None
 
-    if matched_indicators:
-        matched_indicators_list = [
-            indicator.strip() for indicator in matched_indicators.split(",")
-        ]
+    if indicator in indicator_names:
+        return indicator
     else:
-        matched_indicators_list = []
-
-    # 过滤基础指标中的有效匹配项
-    final_matched_indicators = [
-        indicator for indicator in indicator_names if indicator in matched_indicators_list
-    ]
-
-    return final_matched_indicators[0] if final_matched_indicators else None
+        return None
 
 def force_match_indicator(user_question, indicator_names):
     matched_indicators = []
