@@ -624,6 +624,11 @@ def dws_connect(sql_query,key_fields=None,display_type="response_bar_chart"):
             cursor.execute(sql_query)
 
             results = cursor.fetchall()
+            length_pre = len(results)
+            results = [row for row in results if None not in row]
+            results_length = len(results)
+            if length_pre - results_length != 0:
+                print(f"{length_pre} 删空后为 {results_length}")
             end_time = time.time()
             elapsed_time = end_time - start_time
             print(f"查询耗时{elapsed_time}秒")
@@ -635,7 +640,7 @@ def dws_connect(sql_query,key_fields=None,display_type="response_bar_chart"):
                 key_field_words = [word.strip() for word in key_fields.split(',')]
                 positions = {i for i, word in enumerate(column_names) if word in key_field_words}
 
-            results_length = len(results)
+            
             if results_length > 100:
                 results = results[:100]
                 results_length = 100

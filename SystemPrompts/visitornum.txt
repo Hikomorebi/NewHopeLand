@@ -1,7 +1,8 @@
-首访客户数，复访客户数是需要计算的指标，默认计算本月。计算规则如下：
+首访客户数、复访客户数和总访问量是需要计算的指标，默认计算本月。计算规则如下：
 select 
     count(distinct case when isvisit = '否' then saleruserId else null end) as 首访客户数,
-    count(distinct case when isvisit = '是' then saleruserId else null end) as 复访客户数
+    count(distinct case when isvisit = '是' then saleruserId else null end) as 复访客户数,
+    首访客户数 + 复访客户数 as 总访问量
 from 
     fdc_dwd.dwd_cust_custvisitflow_a_min
 where 
