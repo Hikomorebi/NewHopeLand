@@ -6,6 +6,8 @@ import time
 import traceback
 from MateGen import MateGen
 import json
+import psycopg2
+from psycopg2.extras import RealDictCursor
 from generate_report import generate_json_report, query_customer_info
 from utils import (
     default_converter,
@@ -14,6 +16,8 @@ from utils import (
     dict_intersection,
     process_user_input,
     select_table_based_on_indicator,
+    get_consultant_ids,
+    get_project_name,
 )
 from auto_select_tables import select_table_based_on_query
 
@@ -126,7 +130,7 @@ def chat():
 
         # 问题干预：status=1,preset_sql为sql语句，is_indicator指示是否为指标问数
         # 指标管理：status=2,indicator_name为指标名,indicator_data为指标描述
-        # 基础问数：status=3,user_question为用户问题
+        # 基础问数：status=3,user_question为用户问题，indicator_name为base
         # "indicator_name = 'base'"表示基础问数
         process_user_input_dict = process_user_input(query)
 
@@ -176,7 +180,8 @@ def chat():
                     chosen_tables = indicator_prompt_dict[indicator_name]['chosen_tables']
                 else:
                     chosen_tables = select_table_based_on_indicator(
-                        process_user_input_dict["indicator_data"]["数据来源"]
+                        process_user_input_dict["indicator_data"]["数据来源"],
+                        process_user_input_dict["indicator_data"]["数据来源表"]
                     )
                 print(f"选择的表是：{chosen_tables}")
             if chosen_tables is None:
@@ -241,8 +246,10 @@ def chat():
         print("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
         print(f"第一阶段：对话准备（数据表选择）耗时: {elapsed_time:.4f} 秒")
 
+        # chat函数
         chat_dict = mategen.chat(process_user_input_dict)
 
+        
         chat_dict["time"] = f"\n第一阶段：对话准备（数据表选择）耗时: {elapsed_time:.4f} 秒" + chat_dict["time"]
         if "chosen_tables" not in chat_dict:
             if is_new:
@@ -314,24 +321,25 @@ def analysis():
     try:
         data = request.json
         # 获取传递的参数
-        saleropenid = data.get("saleropenid")
-        subordinateId = data.get("subordinateId")
+        saleropenid = data.get("saleropenid") 
+        roleid = data.get("roleId")
         projectId = data.get("projectId")
-        projectName = data.get("projectName")
         start_date = data.get("start_date")
         end_date = data.get("end_date")
 
-        if not all([saleropenid,projectId,projectName,start_date,end_date]):
+        if not all([roleid,projectId,start_date,end_date]):
             return jsonify({
                 "status": "error",
                 "response": "缺少必要的参数",
             })
         
-        # 如果是销售主管，查询所有下属的置业顾问的顾客信息
-        if subordinateId:
-            # 将subordinateId字符串分割成列表
-            subordinate_ids = subordinateId.split(",")
-            customer_data = []
+        # 设置角色信息csv文件路径
+        csv_file_path ="./role.csv"
+        # 初始化客户信息列表
+        customer_data = []
+        # 如果是销售经理，查询所有下属的置业顾问的顾客信息
+        if roleid == "2015":
+            subordinate_ids = get_consultant_ids(projectId, csv_file_path)
             # 遍历每个sub_id
             for sub_id in subordinate_ids:
                 # 确保sub_id不为空
@@ -345,6 +353,7 @@ def analysis():
         if not customer_data:
             return jsonify({"status": "error", "response": "未查询到相关客户信息。"})
 
+        projectName = get_project_name(projectId,csv_file_path)
         json_report = generate_json_report(customer_data,projectId,projectName)
 
         report_filename = f"Reports/高意向客户分析报告_{saleropenid}.json"
