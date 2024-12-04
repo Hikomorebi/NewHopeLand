@@ -322,7 +322,7 @@ def analysis():
         data = request.json
         # 获取传递的参数
         saleropenid = data.get("saleropenid") 
-        roleid = data.get("roleid")
+        roleid = data.get("roleId")
         projectId = data.get("projectId")
         start_date = data.get("start_date")
         end_date = data.get("end_date")
