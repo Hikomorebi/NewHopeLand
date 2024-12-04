@@ -6,6 +6,8 @@ import time
 import traceback
 from MateGen import MateGen
 import json
+import psycopg2
+from psycopg2.extras import RealDictCursor
 from generate_report import generate_json_report, query_customer_info
 from utils import (
     default_converter,
@@ -16,6 +18,8 @@ from utils import (
     dict_intersection,
     process_user_input,
     select_table_based_on_indicator,
+    get_consultant_ids,
+    get_project_name,
 )
 from auto_select_tables import select_table_based_on_query
 
@@ -341,24 +345,25 @@ def analysis():
     try:
         data = request.json
         # 获取传递的参数
-        saleropenid = data.get("saleropenid")
-        subordinateId = data.get("subordinateId")
+        saleropenid = data.get("saleropenid") 
+        roleid = data.get("roleid")
         projectId = data.get("projectId")
-        projectName = data.get("projectName")
         start_date = data.get("start_date")
         end_date = data.get("end_date")
 
-        if not all([saleropenid,projectId,projectName,start_date,end_date]):
+        if not all([roleid,projectId,start_date,end_date]):
             return jsonify({
                 "status": "error",
                 "response": "缺少必要的参数",
             })
         
-        # 如果是销售主管，查询所有下属的置业顾问的顾客信息
-        if subordinateId:
-            # 将subordinateId字符串分割成列表
-            subordinate_ids = subordinateId.split(",")
-            customer_data = []
+        # 设置角色信息csv文件路径
+        csv_file_path ="./role.csv"
+        # 初始化客户信息列表
+        customer_data = []
+        # 如果是销售经理，查询所有下属的置业顾问的顾客信息
+        if roleid == "2015":
+            subordinate_ids = get_consultant_ids(projectId, csv_file_path)
             # 遍历每个sub_id
             for sub_id in subordinate_ids:
                 # 确保sub_id不为空
@@ -372,6 +377,7 @@ def analysis():
         if not customer_data:
             return jsonify({"status": "error", "response": "未查询到相关客户信息。"})
 
+        projectName = get_project_name(projectId,csv_file_path)
         json_report = generate_json_report(customer_data,projectId,projectName)
 
         report_filename = f"Reports/高意向客户分析报告_{saleropenid}.json"
