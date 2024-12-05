@@ -150,7 +150,7 @@ class MateGen:
                 if sql_code == "":
                     chat_dict["status"] = 2
                     chat_dict["sql_error_message"] = (
-                        "针对该问题无法为您生成可用的查询。"
+                        "我现在还回答不了这样的问题，敬请期待。"
                     )
                     self.messages.messages_append(
                         {
@@ -180,7 +180,8 @@ class MateGen:
                     # 3 表示仍然没有匹配上指标
                     if dict_force['status'] == 3:
                         chat_dict["status"] = 2
-                        chat_dict["sql_error_message"] = sql_exec_dict["error_message"]
+                        chat_dict["sql_error_message"] = "我现在还回答不了这样的问题，敬请期待。"
+                        print(sql_exec_dict["error_message"])
                         self.messages.messages_append(
                             {
                                 "role": "assistant",
@@ -200,7 +201,8 @@ class MateGen:
 
                 else:
                     chat_dict["status"] = 2
-                    chat_dict["sql_error_message"] = sql_exec_dict["error_message"]
+                    chat_dict["sql_error_message"] = "我现在还回答不了这样的问题，敬请期待。"
+                    print(sql_exec_dict["error_message"])
                     self.messages.messages_append(
                         {
                             "role": "assistant",
@@ -210,7 +212,7 @@ class MateGen:
                     return chat_dict
             elif sql_exec_dict["status"] == 2:
                 chat_dict["status"] = 1
-                chat_dict["gpt_response"] = "你好，没有查询到相关数据，请换一种问法"
+                chat_dict["gpt_response"] = "没有输出，换个问法试试..."
                 self.messages.messages_append(
                     {
                         "role": "assistant",
