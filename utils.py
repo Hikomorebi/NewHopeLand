@@ -623,6 +623,12 @@ def dws_connect(sql_query,key_fields=None,display_type="response_bar_chart"):
             results = cursor.fetchall()
             length_pre = len(results)
             results = [row for row in results if None not in row]
+            rows_to_delete = []
+            for row in results:
+                if all(isinstance(value, (int, float)) and value == 0 for value in row):
+                    rows_to_delete.append(row)
+            results = rows_to_delete
+
             results_length = len(results)
             if length_pre - results_length != 0:
                 print(f"{length_pre} 删空后为 {results_length}")
