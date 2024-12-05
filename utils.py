@@ -1,7 +1,6 @@
 import psycopg2
 import pymysql
 import os
-import pandas as pd
 import json
 from datetime import date
 import re
@@ -11,7 +10,6 @@ from openai import OpenAI
 import Levenshtein  # 使用 Levenshtein 库来计算字符串距离
 import time
 import csv
-import jieba
 fuzzy_match_prompt = """
 在地产销售问数场景中，销售人员可能会针对一个指标进行提问，可能会涉及到的指标有{all_indicators}。
 现在销售人员进行提问，请仔细分析问题，如果问题涉及到某个指标，请返回该指标名。如果提问涉及多个可能的指标，也只需要回答一个指标名即可。如果问题不涉及任何指标，不要强行匹配指标，请返回'无关指标'。
@@ -621,13 +619,30 @@ def dws_connect(sql_query,key_fields=None,display_type="response_bar_chart"):
             cursor.execute(sql_query)
 
             results = cursor.fetchall()
+            column_description = cursor.description
             length_pre = len(results)
             results = [row for row in results if None not in row]
-            rows_to_delete = []
-            for row in results:
-                if all(isinstance(value, (int, float)) and value == 0 for value in row):
-                    rows_to_delete.append(row)
-            results = rows_to_delete
+
+            numeric_types = {1700, 700, 701, 23, 20}
+
+            # 遍历结果集并检查条件
+            rows_to_delete = []  # 保存需要删除的行的索引
+            for row_index, row in enumerate(results):
+                all_zero = True  # 标志是否所有数值列都为0
+                for col_index, col in enumerate(row):
+                    # 获取列的type_code
+                    col_type_code = column_description[col_index].type_code
+                    if col_type_code in numeric_types:  # 如果是数值类型
+                        if col != 0:  # 如果该列不为0
+                            all_zero = False
+                            break  # 该行不满足条件，跳出循环
+                if all_zero:
+                    rows_to_delete.append(row_index)
+
+            # 删除满足条件的行
+            for row_index in reversed(rows_to_delete):  # 反向删除，避免修改索引问题
+                results.pop(row_index)
+
 
             results_length = len(results)
             if length_pre - results_length != 0:
@@ -635,7 +650,7 @@ def dws_connect(sql_query,key_fields=None,display_type="response_bar_chart"):
             end_time = time.time()
             elapsed_time = end_time - start_time
             print(f"查询耗时{elapsed_time}秒")
-            column_description = cursor.description
+            
             column_names, type_codes = zip(*((des[0], des[1]) for des in column_description))
             if key_fields is None or key_fields=="":
                 positions = set(range(len(column_names)))
