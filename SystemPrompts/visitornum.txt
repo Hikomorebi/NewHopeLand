@@ -36,6 +36,7 @@ SELECT CAST(
 FROM 
     current_period, previous_period;
 其中模板变量 ${isvisit} 根据计算首访客户数还是复访客户数填入‘否’或‘是’。
+6. 如果需要查询某个城市的数据，请使用 projname 进行模糊匹配。如查询“重庆的来访客户”，使用 projname LIKE '%重庆%' 作为筛选条件。
 7. 占比表示计算某项目占其所属公司的数据的比重。
 请严格按照计算规则的逻辑给出SQL代码，并按照以下JSON格式响应：
 {
