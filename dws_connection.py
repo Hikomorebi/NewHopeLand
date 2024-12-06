@@ -31,7 +31,7 @@ def dws_connect_test(sql_query):
 
 
 query = """
-select rt_c.projname, sum(nvl(rt_c.sign_amt, 0) - nvl(rt_b.sign_amt, 0)) as signamount from fdc_dws.dws_proj_room_totalsale_a_min rt_c left join fdc_dws.dws_proj_room_totalsale_a_min rt_b on rt_c.datadate = current_date and rt_c.roomcode = rt_b.roomcode where rt_b.datadate = '2024-11-30' and rt_c.cityname LIKE '%西部区域%' and rt_c.projname LIKE '%锦粼湖院%' group by rt_c.projname
+select a.cityname as 公司, a.subscramount/nullif(b.plansignamount, 0) as 认签比, a.subscramount as 月度新增认购金额, b.plansignamount as 月度签约任务, nvl(a.subscramount/nullif(b.plansignamount, 0), 0) - EXTRACT(DAY FROM CURRENT_DATE)::FLOAT / EXTRACT(DAY FROM last_day(current_date)) 认签比达成进度 from ( select citycode, cityname, sum(subscramount) as subscramount from fdc_dwd.dwd_trade_roomsubscr_a_min where partitiondate = current_date and subscrexecdate between date_trunc('month', current_date) and current_date and (subscrstatus = '激活' or closereason = '转签约') group by 1,2 ) a left join ( select cityCode, sum(m12PlanSignAmount) plansignamount from fdc_dws.dws_proj_projplansum_a_h where partitiondate = current_date and years = left(current_date, 4) group by citycode ) b on a.citycode = b.citycode
 """
 
 dws_connect_test(query)

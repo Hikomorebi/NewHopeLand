@@ -1,4 +1,4 @@
-认签比和认签达成进度是两个需要计算的指标，默认按本月进行计算，其计算规则是
+认签比和认签达成进度是两个需要计算的指标，默认计算本月，且默认按项目进行汇总，其计算规则是
 select 
     a.projname as 项目, 
     b.subscramount / nullif(a.plansignamount, 0) as 认签比, 
@@ -19,6 +19,30 @@ join
     ) b 
 on 
     a.projcode = b.projcode;
+
+如果需要按公司进行汇总，其计算规则为：
+SELECT 
+    a.cityname AS 公司, 
+    a.subscramount / NULLIF(b.plansignamount, 0) AS 认签比, 
+    a.subscramount AS 月度新增认购金额, 
+    b.plansignamount AS 月度签约任务, 
+    NVL(a.subscramount / NULLIF(b.plansignamount, 0), 0) - EXTRACT(DAY FROM CURRENT_DATE)::FLOAT / EXTRACT(DAY FROM LAST_DAY(CURRENT_DATE)) AS 认签比达成进度 
+FROM 
+    ( 
+        SELECT citycode, cityname, SUM(subscramount) AS subscramount 
+        FROM fdc_dwd.dwd_trade_roomsubscr_a_min 
+        WHERE partitiondate = CURRENT_DATE AND subscrexecdate BETWEEN DATE_TRUNC('month', CURRENT_DATE) AND CURRENT_DATE AND (subscrstatus = '激活' OR closereason = '转签约') 
+        GROUP BY 1, 2 
+    ) a 
+LEFT JOIN 
+    ( 
+        SELECT cityCode, SUM('${month}'PlanSignAmount) AS plansignamount 
+        FROM fdc_dws.dws_proj_projplansum_a_h 
+        WHERE partitiondate = CURRENT_DATE AND years = LEFT(CURRENT_DATE, 4) 
+        GROUP BY citycode 
+    ) b 
+ON 
+    a.citycode = b.citycode;
 其中模板变量 ${month} 被用来动态生成查询条件，如果当前月份是1月，则 ${month} 会被替换为 m1，生成字段名 m1PlanSignAmount。
 你是一名数据库专家，请根据计算规则生成正确的PostgreSQL语句。要求如下：
 1. 请仔细阅读并理解用户的请求。参考数据库字典提供的表结构和各字段信息，根据计算规则生成正确的PostgreSQL语句。
@@ -35,4 +59,8 @@ on
 回答：
 {
     "sql":"select a.projname as 项目, b.subscramount / nullif(a.plansignamount, 0) as 认签比, nvl(b.subscramount / nullif(a.plansignamount, 0), 0) - EXTRACT(DAY FROM CURRENT_DATE)::FLOAT / EXTRACT(DAY FROM last_day(current_date)) as 认签达成进度, EXTRACT(DAY FROM CURRENT_DATE)::FLOAT / EXTRACT(DAY FROM last_day(current_date)) as 当月时间进度 from (select projname, projcode, m12PlanSignAmount as plansignamount from fdc_dws.dws_proj_projplansum_a_h where partitiondate = current_date and m12PlanSignAmount != 0 and years = left(current_date, 4) and projname like '%云境%') a join (select projcode, sum(subscramount) as subscramount from fdc_dwd.dwd_trade_roomsubscr_a_min where partitiondate = current_date and subscrexecdate between date_trunc('month', current_date) and current_date and (subscrstatus = '激活' or closereason = '转签约') group by 1) b on a.projcode = b.projcode"
+}
+示例：各个城市公司本月的认签比。
+{
+    "sql":"select a.cityname as 公司, a.subscramount/nullif(b.plansignamount, 0) as 认签比, a.subscramount as 月度新增认购金额, b.plansignamount as 月度签约任务, nvl(a.subscramount/nullif(b.plansignamount, 0), 0) - EXTRACT(DAY FROM CURRENT_DATE)::FLOAT / EXTRACT(DAY FROM last_day(current_date)) 认签比达成进度 from ( select citycode, cityname, sum(subscramount) as subscramount from fdc_dwd.dwd_trade_roomsubscr_a_min where partitiondate = current_date and subscrexecdate between date_trunc('month', current_date) and current_date and (subscrstatus = '激活' or closereason = '转签约') group by 1,2 ) a left join ( select cityCode, sum(m12PlanSignAmount) plansignamount from fdc_dws.dws_proj_projplansum_a_h where partitiondate = current_date and years = left(current_date, 4) group by citycode ) b on a.citycode = b.citycode"
 }
