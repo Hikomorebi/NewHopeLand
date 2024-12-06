@@ -31,7 +31,7 @@ def dws_connect_test(sql_query):
 
 
 query = """
-select a.cityname as 公司, a.subscramount/nullif(b.plansignamount, 0) as 认签比, a.subscramount as 月度新增认购金额, b.plansignamount as 月度签约任务, nvl(a.subscramount/nullif(b.plansignamount, 0), 0) - EXTRACT(DAY FROM CURRENT_DATE)::FLOAT / EXTRACT(DAY FROM last_day(current_date)) 认签比达成进度 from ( select citycode, cityname, sum(subscramount) as subscramount from fdc_dwd.dwd_trade_roomsubscr_a_min where partitiondate = current_date and subscrexecdate between date_trunc('month', current_date) and current_date and (subscrstatus = '激活' or closereason = '转签约') group by 1,2 ) a left join ( select cityCode, sum(m12PlanSignAmount) plansignamount from fdc_dws.dws_proj_projplansum_a_h where partitiondate = current_date and years = left(current_date, 4) group by citycode ) b on a.citycode = b.citycode
+WITH current_period AS (SELECT COUNT(DISTINCT CASE WHEN isvisit = '否' THEN saleruserId ELSE NULL END) AS 当期数据 FROM fdc_dwd.dwd_cust_custvisitflow_a_min WHERE partitiondate = CURRENT_DATE AND LEFT(visitDate, 10) BETWEEN '2024-12-01' AND '2024-12-31'), previous_period AS (SELECT COUNT(DISTINCT CASE WHEN isvisit = '否' THEN saleruserId ELSE NULL END) AS 基期数据 FROM fdc_dwd.dwd_cust_custvisitflow_a_min WHERE partitiondate = CURRENT_DATE AND LEFT(visitDate, 10) BETWEEN '2024-11-01' AND '2024-11-30') SELECT CAST((current_period.当期数据 - previous_period.基期数据) * 1.0 / NULLIF(previous_period.基期数据, 0) AS DECIMAL(10, 4)) AS 首访客户数环比增长率 FROM current_period, previous_period
 """
 
 dws_connect_test(query)
