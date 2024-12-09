@@ -722,8 +722,14 @@ def generate_json_report(customers,projectId,projectName):
 
                 report["复访"].append(customer_report)
     
+    # 确保来访客户数等于新增来访数加复访客户数
+    if visitornum != newvisitornum + revisitornum:
+        raise ValueError("数据不一致：来访客户数不等于新增来访数加复访客户数")
+
     report["来访客户"] = visitornum
     report["新增来访"] = newvisitornum
     report["复访客户"] = revisitornum
 
     return report
+
+    
