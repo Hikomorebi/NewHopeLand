@@ -31,7 +31,7 @@ def dws_connect_test(sql_query):
 
 
 query = """
-select rt_c.projname, sum(nvl(rt_c.sign_amt, 0) - nvl(rt_b.sign_amt, 0)) as signamount from fdc_dws.dws_proj_room_totalsale_a_min rt_c left join fdc_dws.dws_proj_room_totalsale_a_min rt_b on rt_c.datadate = current_date and rt_c.roomcode = rt_b.roomcode where rt_b.datadate = '2024-11-30' and rt_c.cityname LIKE '%西部区域%' and rt_c.projname LIKE '%锦粼湖院%' group by rt_c.projname
+WITH current_period AS (SELECT COUNT(DISTINCT CASE WHEN isvisit = '否' THEN saleruserId ELSE NULL END) AS 当期数据 FROM fdc_dwd.dwd_cust_custvisitflow_a_min WHERE partitiondate = CURRENT_DATE AND LEFT(visitDate, 10) BETWEEN '2024-12-01' AND '2024-12-31'), previous_period AS (SELECT COUNT(DISTINCT CASE WHEN isvisit = '否' THEN saleruserId ELSE NULL END) AS 基期数据 FROM fdc_dwd.dwd_cust_custvisitflow_a_min WHERE partitiondate = CURRENT_DATE AND LEFT(visitDate, 10) BETWEEN '2024-11-01' AND '2024-11-30') SELECT CAST((current_period.当期数据 - previous_period.基期数据) * 1.0 / NULLIF(previous_period.基期数据, 0) AS DECIMAL(10, 4)) AS 首访客户数环比增长率 FROM current_period, previous_period
 """
 
 dws_connect_test(query)

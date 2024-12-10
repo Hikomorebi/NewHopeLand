@@ -59,7 +59,7 @@ def post_chat(query):
         print("Exception occurred:", str(e))
 
 
-post_chat("哪些渠道带来的客户最多")
+
 # 1
 #post_chat("本月新增认购")
 #post_chat("其中西部公司是多少")
@@ -86,4 +86,4 @@ post_chat("哪些渠道带来的客户最多")
 # 6
 #post_chat("今年双十一期间的新增认购")
 #post_chat("与去年同期相差多少")
-#post_chat("其中锦粼湖院与去年同期相差多少")
+post_chat("本月璐麟品项目的来访情况如何？")

@@ -62,7 +62,7 @@ def get_holiday_period(query, file_path):
 
 if __name__ == "__main__":
     # 示例查询
-    query = "2024年清明节的净利润是多少"
+    query = "2024年中秋节的净利润是多少"
     file_path = "Database/Date.txt"  # 文件的正确路径
     holiday_period = get_holiday_period(query,file_path)
     print(holiday_period)
