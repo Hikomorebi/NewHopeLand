@@ -344,7 +344,7 @@ def analysis():
             for sub_id in subordinate_ids:
                 # 确保sub_id不为空
                 if sub_id:
-                    customers = query_customer_info(sub_id.strip(),start_date,end_date)  
+                    customers = query_customer_info(sub_id,start_date,end_date)  
                     customer_data.extend(customers)
         # 如果是置业顾问，只查询自己的顾客信息        
         else:
