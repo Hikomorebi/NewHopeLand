@@ -31,7 +31,7 @@ def dws_connect_test(sql_query):
 
 
 query = """
-WITH current_period AS (SELECT COUNT(DISTINCT CASE WHEN isvisit = '否' THEN saleruserId ELSE NULL END) AS 当期数据 FROM fdc_dwd.dwd_cust_custvisitflow_a_min WHERE partitiondate = CURRENT_DATE AND LEFT(visitDate, 10) BETWEEN '2024-12-01' AND '2024-12-31'), previous_period AS (SELECT COUNT(DISTINCT CASE WHEN isvisit = '否' THEN saleruserId ELSE NULL END) AS 基期数据 FROM fdc_dwd.dwd_cust_custvisitflow_a_min WHERE partitiondate = CURRENT_DATE AND LEFT(visitDate, 10) BETWEEN '2024-11-01' AND '2024-11-30') SELECT CAST((current_period.当期数据 - previous_period.基期数据) * 1.0 / NULLIF(previous_period.基期数据, 0) AS DECIMAL(10, 4)) AS 首访客户数环比增长率 FROM current_period, previous_period
+SELECT phone, name, project_name, report_type, customer_name, customer_phone, intention_level FROM fdc_ods.ods_hwy_ai_nh_high_intent_report_a_d WHERE partitiondate = current_date - 1 AND report_date BETWEEN date_trunc('month', current_date) AND current_date AND (intention_level LIKE '%A%' OR intention_level LIKE '%B%')
 """
 
 dws_connect_test(query)

@@ -86,4 +86,4 @@ def post_chat(query):
 # 6
 #post_chat("今年双十一期间的新增认购")
 #post_chat("与去年同期相差多少")
-post_chat("本月璐麟品项目的来访情况如何？")
+post_chat("本月的高意向客户有哪些")

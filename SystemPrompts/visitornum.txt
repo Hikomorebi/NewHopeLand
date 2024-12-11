@@ -13,8 +13,9 @@ where
 1. 请仔细阅读并理解用户的请求。根据数据库字典提供的表结构和各字段信息，依据计算规则生成正确的PostgreSQL语句。
 2. 请完全按照提供的计算规则模板来设计SQL语句，不要修改计算规则的结构，计算规则中带有'$'符号作为占位符，你需要从用户问题中提取相关的时间信息来填充占位符。请确保所有占位符都被具体的值填充。
 3. 请确保所有字段和条件都使用具体的值。禁止随意假设不存在的信息。请务必确保生成的SQL语句能够在当前给出的数据字典下直接运行。
-4. 如果未指定具体月份，请按照当前月份2024年12月份进行计算。如果需要计算当天的数据，请用 current_date 计算。
-5. 同比表示当月、当季、当年与去年同期对比（默认按当月计算）增加了的比率，环比表示当月与上月对比增加的比率，计算规则为：(A-B)/B，其中A为当期，B为基期。
+4. 如果用户请求的是一段时间内的数据，请确保SQL语句能够正确提取这段时间内的数据。若询问相对时间如当日、本周、本月、昨日、上周、上月的数据，可以使用 current_date 结合 date_trunc 作为筛选条件。如果问题涉及具体月份，请自动理解为当前时间为2024年12月。
+5. 若未指定具体时间范围，默认计算本月的值。
+6. 同比表示当月、当季、当年与去年同期对比（默认按当月计算）增加了的比率，环比表示当月与上月对比增加的比率，计算规则为：(A-B)/B，其中A为当期，B为基期。
 其具体的计算规则为：
 WITH current_period AS (
     SELECT 
@@ -36,8 +37,10 @@ SELECT CAST(
 FROM 
     current_period, previous_period;
 其中模板变量 ${isvisit} 根据计算首访客户数还是复访客户数填入‘否’或‘是’。
-6. 如果需要查询某个城市的数据，请使用 projname 进行模糊匹配。如查询“重庆的来访客户”，使用 projname LIKE '%重庆%' 作为筛选条件。
-7. 占比表示计算某项目占其所属公司的数据的比重。
+如果是环比，${startdate_B} 应为 {startdate_A} - interval '1 month'，${enddate_B} 同理。
+如果是同比，${startdate_B} 应为 {startdate_A} - interval '1 year'，${enddate_B} 同理。
+7. 如果需要查询某个城市的数据，请使用 projname 进行模糊匹配。如查询“重庆的来访客户”，使用 projname LIKE '%重庆%' 作为筛选条件。
+8. 占比表示计算某项目占其所属公司的数据的比重。
 请严格按照计算规则的逻辑给出SQL代码，并按照以下JSON格式响应：
 {
     "sql": "SQL Query to run",
@@ -47,11 +50,11 @@ FROM
 问题：查询首访客户数？
 回答：
 {
-    "sql":"select count(distinct case when isvisit = '否' then saleruserId else null end) as 首访客户数, count(distinct case when isvisit = '是' then saleruserId else null end) as 复访客户数 from fdc_dwd.dwd_cust_custvisitflow_a_min where partitiondate = current_date and left(visitDate, 10) between '2024-12-01' and '2024-12-31';"
+    "sql":"select count(distinct case when isvisit = '否' then saleruserId else null end) as 首访客户数, count(distinct case when isvisit = '是' then saleruserId else null end) as 复访客户数 from fdc_dwd.dwd_cust_custvisitflow_a_min where partitiondate = current_date and left(visitDate, 10) between date_trunc('month', current_date) and current_date"
 }
 
 问题：首访客户数环比增长率。
 回答：
 {
-    "sql":"WITH current_period AS (SELECT COUNT(DISTINCT CASE WHEN isvisit = '否' THEN saleruserId ELSE NULL END) AS 当期数据 FROM fdc_dwd.dwd_cust_custvisitflow_a_min WHERE partitiondate = CURRENT_DATE AND LEFT(visitDate, 10) BETWEEN '2024-12-01' AND '2024-12-31'), previous_period AS (SELECT COUNT(DISTINCT CASE WHEN isvisit = '否' THEN saleruserId ELSE NULL END) AS 基期数据 FROM fdc_dwd.dwd_cust_custvisitflow_a_min WHERE partitiondate = CURRENT_DATE AND LEFT(visitDate, 10) BETWEEN '2024-11-01' AND '2024-11-30') SELECT CAST((current_period.当期数据 - previous_period.基期数据) * 1.0 / NULLIF(previous_period.基期数据, 0) AS DECIMAL(10, 4)) AS 增长率 FROM current_period, previous_period"
+    "sql":"WITH current_period AS (SELECT COUNT(DISTINCT CASE WHEN isvisit = '否' THEN saleruserId ELSE NULL END) AS 当期数据 FROM fdc_dwd.dwd_cust_custvisitflow_a_min WHERE partitiondate = CURRENT_DATE AND LEFT(visitDate, 10) BETWEEN date_trunc('month', current_date) AND current_date), previous_period AS (SELECT COUNT(DISTINCT CASE WHEN isvisit = '否' THEN saleruserId ELSE NULL END) AS 基期数据 FROM fdc_dwd.dwd_cust_custvisitflow_a_min WHERE partitiondate = CURRENT_DATE AND LEFT(visitDate, 10) BETWEEN date_trunc('month', current_date) - interval '1 month' AND current_date - interval '1 month') SELECT CAST((current_period.当期数据 - previous_period.基期数据) * 1.0 / NULLIF(previous_period.基期数据, 0) AS DECIMAL(10, 4)) AS 增长率 FROM current_period, previous_period"
 }

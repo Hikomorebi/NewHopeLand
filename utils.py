@@ -624,24 +624,24 @@ def dws_connect(sql_query,key_fields=None,display_type="response_bar_chart"):
             results = [row for row in results if None not in row]
 
             numeric_types = {1700, 700, 701, 23, 20}
+            if any(one_col.type_code in numeric_types for one_col in column_description):
+                # 遍历结果集并检查条件
+                rows_to_delete = []  # 保存需要删除的行的索引
+                for row_index, row in enumerate(results):
+                    all_zero = True  # 标志是否所有数值列都为0
+                    for col_index, col in enumerate(row):
+                        # 获取列的type_code
+                        col_type_code = column_description[col_index].type_code
+                        if col_type_code in numeric_types:  # 如果是数值类型
+                            if col != 0:  # 如果该列不为0
+                                all_zero = False
+                                break  # 该行不满足条件，跳出循环
+                    if all_zero:
+                        rows_to_delete.append(row_index)
 
-            # 遍历结果集并检查条件
-            rows_to_delete = []  # 保存需要删除的行的索引
-            for row_index, row in enumerate(results):
-                all_zero = True  # 标志是否所有数值列都为0
-                for col_index, col in enumerate(row):
-                    # 获取列的type_code
-                    col_type_code = column_description[col_index].type_code
-                    if col_type_code in numeric_types:  # 如果是数值类型
-                        if col != 0:  # 如果该列不为0
-                            all_zero = False
-                            break  # 该行不满足条件，跳出循环
-                if all_zero:
-                    rows_to_delete.append(row_index)
-
-            # 删除满足条件的行
-            for row_index in reversed(rows_to_delete):  # 反向删除，避免修改索引问题
-                results.pop(row_index)
+                # 删除满足条件的行
+                for row_index in reversed(rows_to_delete):  # 反向删除，避免修改索引问题
+                    results.pop(row_index)
 
 
             results_length = len(results)
