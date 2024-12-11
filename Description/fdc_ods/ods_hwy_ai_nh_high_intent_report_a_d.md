@@ -31,5 +31,4 @@ fdc_ods.ods_hwy_ai_nh_high_intent_report_a_d
 | partitiondate           | timestamp without  time zone | 分区日期                    |
 
 - 查询须知
-1. 查询该表时，请务必使用 partitiondate = current_date - 1 筛选分区时期。
-2. 意向等级分为A、B、C、D、E，其中A、B为高意向等级，若问题涉及高意向客户，请通过 intention_level LIKE '%A%' or intention_level LIKE '%B%' 查询。
+1. 意向等级分为A、B、C、D、E，其中A、B为高意向等级，若问题涉及高意向客户，请通过 intention_level LIKE '%A%' or intention_level LIKE '%B%' 查询。
