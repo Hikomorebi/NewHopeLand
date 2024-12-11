@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import sys
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from flask import Flask, Response, request, jsonify
 import os
 import time
@@ -29,10 +30,10 @@ app = Flask(__name__)
 
 # 设置环境变量（仅在当前脚本运行期间有效）
 os.environ["OPENAI_API_KEY"] = "sk-94987a750c924ae19693c9a9d7ea78f7"
-# 设置编码
-sys.stdout.reconfigure(encoding='utf-8')
-# 配置日志格式
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+
+# 配置日志记录
+logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s')
+
 with open("indicator_prompt.json", "r", encoding="utf-8") as file:
     indicator_prompt_dict = json.load(file)
 
@@ -330,12 +331,12 @@ def analysis():
 
         # 获取传递的参数
         saleropenid = data.get("saleropenid") 
-        roleid = data.get("roleId")
+        roleId = data.get("roleId")
         projectId = data.get("projectId")
         start_date = data.get("start_date")
         end_date = data.get("end_date")
 
-        if not all([roleid,projectId,start_date,end_date]):
+        if not all([roleId,projectId,start_date,end_date]):
             return jsonify({
                 "status": "error",
                 "response": "缺少必要的参数",
@@ -345,38 +346,47 @@ def analysis():
         csv_file_path ="./role.csv"
         # 初始化客户信息列表
         customer_data = []
+
+        start_time = time.time()  # 开始计时
+
         # 如果是销售经理，查询所有下属的置业顾问的顾客信息
-        if roleid == "2015":
+        if roleId == "2015":
             subordinate_ids = get_consultant_ids(projectId, csv_file_path)
-            # 遍历每个sub_id
-            for sub_id in subordinate_ids:
-                # 确保sub_id不为空
-                if sub_id:
-                    customers = query_customer_info(sub_id,start_date,end_date)  
+            # 使用线程池并行查询客户信息
+            with ThreadPoolExecutor(max_workers=10) as executor:
+                future_to_customers = {executor.submit(query_customer_info, sub_id, start_date, end_date): sub_id for sub_id in subordinate_ids if sub_id}
+                for future in as_completed(future_to_customers):
+                    customers = future.result()
                     customer_data.extend(customers)
         # 如果是置业顾问，只查询自己的顾客信息        
         else:
             customer_data = query_customer_info(saleropenid,start_date,end_date)
 
+        end_time = time.time()  # 结束计时
+        print(f"查询客户信息耗时: {end_time - start_time} 秒", flush=True)
+
         if not customer_data:
             return jsonify({"status": "error", "response": "未查询到相关客户信息。"})
+        
+        start_time = time.time()  # 开始计时
 
         projectName = get_project_name(projectId,csv_file_path)
         json_report = generate_json_report(customer_data,projectId,projectName)
+
+        end_time = time.time()  # 结束计时
+        print(f"生成AI报告耗时: {end_time - start_time} 秒", flush=True)
 
         report_filename = f"Reports/高意向客户分析报告_{saleropenid}.json"
         with open(report_filename, "w", encoding="utf-8") as file:
             # 美化输出JSON
             json.dump(json_report, file, ensure_ascii=False, indent=4)
 
-        print(f"报告已生成并保存在 {report_filename}")
+        print(f"报告已生成并保存在 {report_filename}", flush=True)
 
         return jsonify({"status": "success", "response": json_report})
 
     except Exception as e:
         traceback.print_exc()
-        # 记录异常信息
-        logging.error(f"An error occurred: {e}")  
         return jsonify({"status": "error", "response": str(e)})
 
 if __name__ == "__main__":
