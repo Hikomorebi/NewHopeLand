@@ -32,3 +32,4 @@ fdc_ods.ods_hwy_ai_nh_high_intent_report_a_d
 
 - 查询须知
 1. 意向等级分为A、B、C、D、E，其中A、B为高意向等级，若问题涉及高意向客户，请通过 intention_level LIKE '%A%' or intention_level LIKE '%B%' 查询。
+2. 注意name代表销售人员姓名，customer_name代表客户姓名
