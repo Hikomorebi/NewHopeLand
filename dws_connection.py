@@ -31,7 +31,8 @@ def dws_connect_test(sql_query):
 
 
 query = """
-SELECT projname, SUM(subscramount * b.equityratio) AS 权益后新增认购金额 FROM fdc_dwd.dwd_trade_roomsubscr_a_min a LEFT JOIN fdc_ads.view_proj_equity_his b ON a.projcode = b.projcode AND a.subscrexecdate BETWEEN b.validdate AND b.invaliddate WHERE partitiondate = CURRENT_DATE AND subscrexecdate BETWEEN date_trunc('month', current_date) AND current_date AND (subscrstatus = '激活' OR closereason = '转签约') AND a.cityname LIKE '%西部区域%' GROUP BY projname ORDER BY 权益后新增认购金额 DESC LIMIT 1
+SELECT COUNT(1) AS 新增认购套数, SUM(a.archArea) AS 新增认购面积, SUM(a.subscramount * b.equityratio) AS 权益后新增认购金额 FROM fdc_dwd.dwd_trade_roomsubscr_a_min a LEFT JOIN fdc_ads.view_proj_equity_his b ON a.projcode = b.projcode AND a.subscrexecdate BETWEEN b.validdate AND b.invaliddate WHERE a.partitiondate = CURRENT_DATE AND a.subscrexecdate BETWEEN date_trunc('year', current_date) AND current_date AND (a.subscrstatus = '激活' OR a.closereason = '转签约') AND a.cityname LIKE '%西部区域%'
+
 """
 
 dws_connect_test(query)
