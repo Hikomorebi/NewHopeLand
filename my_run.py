@@ -1,5 +1,7 @@
 # python3
 # -*- coding: utf-8 -*-
+
+import sys
 from flask import Flask, Response, request, jsonify
 import os
 import time
@@ -20,12 +22,17 @@ from utils import (
     get_project_name,
 )
 from auto_select_tables import select_table_based_on_query
+import logging
+
 
 app = Flask(__name__)
 
 # 设置环境变量（仅在当前脚本运行期间有效）
 os.environ["OPENAI_API_KEY"] = "sk-94987a750c924ae19693c9a9d7ea78f7"
-
+# 设置编码
+sys.stdout.reconfigure(encoding='utf-8')
+# 配置日志格式
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 with open("indicator_prompt.json", "r", encoding="utf-8") as file:
     indicator_prompt_dict = json.load(file)
 
@@ -320,6 +327,7 @@ def chat():
 def analysis():
     try:
         data = request.json
+
         # 获取传递的参数
         saleropenid = data.get("saleropenid") 
         roleid = data.get("roleId")
@@ -367,6 +375,8 @@ def analysis():
 
     except Exception as e:
         traceback.print_exc()
+        # 记录异常信息
+        logging.error(f"An error occurred: {e}")  
         return jsonify({"status": "error", "response": str(e)})
 
 if __name__ == "__main__":
