@@ -31,7 +31,12 @@ def dws_connect_test(sql_query):
 
 
 query = """
-SELECT rt_c.projname, sum(nvl(rt_c.sub_amt, 0) - nvl(rt_b.sub_amt, 0)) AS subamount FROM fdc_dws.dws_proj_room_totalsale_a_min rt_c LEFT JOIN fdc_dws.dws_proj_room_totalsale_a_min rt_b ON rt_c.datadate = date_trunc('month', current_date) - interval '1 day' AND rt_c.roomcode = rt_b.roomcode WHERE rt_b.datadate = date_trunc('month', current_date) - interval '1 month' - interval '1 day' AND rt_c.partitiondate = date_trunc('month', current_date) - interval '1 day' AND rt_c.cityname LIKE '%西部区域%' AND rt_c.projname LIKE '%锦粼湖院%' GROUP BY rt_c.projname
+select a.projname as 项目, b.subscramount / nullif(a.plansignamount, 0) as 认签比, nvl(b.subscramount / nullif(a.plansignamount,
+ 0), 0) - EXTRACT(DAY FROM CURRENT_DATE)::FLOAT / EXTRACT(DAY FROM last_day(current_date)) as 认签达成进度, EXTRACT(DAY FROM CURRENT_DATE)::FLOAT / EXTRACT(DAY FROM last_day(current_date)) as 当月时间进度 from (select projname, projcode, m12PlanSignAmount as plansignamount from f
+dc_dws.dws_proj_projplansum_a_h where partitiondate = current_date and m12PlanSignAmount != 0 and years = left(current_date, 4) and projname
+ like '%云境%') a join (select projcode, sum(subscramount) as subscramount from fdc_dwd.dwd_trade_roomsubscr_a_min where partitiondate = cur
+rent_date and subscrexecdate between date_trunc('month', current_date) and current_date and (subscrstatus = '激活' or closereason = '转签约'
+) group by 1) b on a.projcode = b.projcode
 
 """
 
