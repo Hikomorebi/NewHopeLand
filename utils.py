@@ -28,6 +28,11 @@ assistant:
 {{
     "indicator":"无关指标"
 }}
+user:目前有多少客户处于认购状态？
+assistant:
+{{
+    "indicator":"无关指标"
+}}
 现在销售人员提问：
 user:{user_question}
 要求只返回最终的json对象，不要包含其余内容。
