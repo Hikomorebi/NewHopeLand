@@ -140,7 +140,7 @@ def chat():
         # 同时满足如下条件下不单开对话，1、session_id已存在 2、【基础问数,新指标，旧指标】中不是新指标 3、count小于等于5
         if session_id in mategen_dict:
             mategen = mategen_dict[session_id]
-            if process_user_input_dict.get("indicator_name",None) in [mategen.current_indicator,"base"] and mategen.current_count <= 5:
+            if process_user_input_dict.get("indicator_name",None) in [mategen.current_indicator,"base"] and mategen.current_count <= 10:
                 is_new = False
                 mategen.current_count += 1
             else:
