@@ -31,7 +31,7 @@ def dws_connect_test(sql_query):
 
 
 query = """
-SELECT COUNT(1) AS 新增认购套数, SUM(a.archArea) AS 新增认购面积, SUM(a.subscramount * b.equityratio) AS 权益后新增认购金额 FROM fdc_dwd.dwd_trade_roomsubscr_a_min a LEFT JOIN fdc_ads.view_proj_equity_his b ON a.projcode = b.projcode AND a.subscrexecdate BETWEEN b.validdate AND b.invaliddate WHERE a.partitiondate = CURRENT_DATE AND a.subscrexecdate BETWEEN date_trunc('year', current_date) AND current_date AND (a.subscrstatus = '激活' OR a.closereason = '转签约') AND a.cityname LIKE '%西部区域%'
+SELECT rt_c.projname, sum(nvl(rt_c.sub_amt, 0) - nvl(rt_b.sub_amt, 0)) AS subamount FROM fdc_dws.dws_proj_room_totalsale_a_min rt_c LEFT JOIN fdc_dws.dws_proj_room_totalsale_a_min rt_b ON rt_c.datadate = date_trunc('month', current_date) - interval '1 day' AND rt_c.roomcode = rt_b.roomcode WHERE rt_b.datadate = date_trunc('month', current_date) - interval '1 month' - interval '1 day' AND rt_c.partitiondate = date_trunc('month', current_date) - interval '1 day' AND rt_c.cityname LIKE '%西部区域%' AND rt_c.projname LIKE '%锦粼湖院%' GROUP BY rt_c.projname
 
 """
 

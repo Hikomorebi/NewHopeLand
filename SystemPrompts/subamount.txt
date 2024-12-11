@@ -30,8 +30,8 @@ group by
 }
 要求只返回最终的json对象，不要包含其余内容。
 示例如下：
-问题：查询西部区域公司成都锦粼湖院认购金额？
+问题：查询上月西部区域公司成都锦粼湖院认购金额？
 回答：
 {
-    "sql":"SELECT rt_c.projname, sum(nvl(rt_c.sub_amt, 0) - nvl(rt_b.sub_amt, 0)) AS subamount FROM fdc_dws.dws_proj_room_totalsale_a_min rt_c LEFT JOIN fdc_dws.dws_proj_room_totalsale_a_min rt_b ON rt_c.datadate = current_date AND rt_c.roomcode = rt_b.roomcode WHERE rt_b.datadate = date_trunc('month', current_date) - interval '1 day' AND rt_c.partitiondate = current_date AND rt_c.cityname LIKE '%西部区域%' AND rt_c.projname LIKE '%锦粼湖院%' GROUP BY rt_c.projname"
+    "sql":"SELECT rt_c.projname, sum(nvl(rt_c.sub_amt, 0) - nvl(rt_b.sub_amt, 0)) AS subamount FROM fdc_dws.dws_proj_room_totalsale_a_min rt_c LEFT JOIN fdc_dws.dws_proj_room_totalsale_a_min rt_b ON rt_c.datadate = date_trunc('month', current_date) - interval '1 day' AND rt_c.roomcode = rt_b.roomcode WHERE rt_b.datadate = date_trunc('month', current_date) - interval '1 month' - interval '1 day' AND rt_c.partitiondate = date_trunc('month', current_date) - interval '1 day' AND rt_c.cityname LIKE '%西部区域%' AND rt_c.projname LIKE '%锦粼湖院%' GROUP BY rt_c.projname"
 }
