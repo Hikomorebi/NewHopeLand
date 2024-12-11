@@ -19,7 +19,6 @@ from utils import (
     get_consultant_ids,
     get_project_name,
 )
-from get_date import get_enhanced_query
 from auto_select_tables import select_table_based_on_query
 
 app = Flask(__name__)
