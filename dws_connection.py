@@ -31,7 +31,7 @@ def dws_connect_test(sql_query):
 
 
 query = """
-SELECT phone, name, project_name, report_type, customer_name, customer_phone, intention_level FROM fdc_ods.ods_hwy_ai_nh_high_intent_report_a_d WHERE partitiondate = current_date - 1 AND report_date BETWEEN date_trunc('month', current_date) AND current_date AND (intention_level LIKE '%A%' OR intention_level LIKE '%B%')
+SELECT projname, SUM(subscramount * b.equityratio) AS 权益后新增认购金额 FROM fdc_dwd.dwd_trade_roomsubscr_a_min a LEFT JOIN fdc_ads.view_proj_equity_his b ON a.projcode = b.projcode AND a.subscrexecdate BETWEEN b.validdate AND b.invaliddate WHERE partitiondate = CURRENT_DATE AND subscrexecdate BETWEEN date_trunc('month', current_date) AND current_date AND (subscrstatus = '激活' OR closereason = '转签约') AND a.cityname LIKE '%西部区域%' GROUP BY projname ORDER BY 权益后新增认购金额 DESC LIMIT 1
 """
 
 dws_connect_test(query)
