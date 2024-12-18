@@ -32,7 +32,6 @@ def dws_connect_test(sql_query):
 
 query = """
 SELECT name, COUNT(*) AS high_intent_count FROM fdc_ods.ods_hwy_ai_nh_high_intent_report_a_d WHERE report_date BETWEEN date_trunc('month', current_date) AND current_date AND (intention_level LIKE '%A%' OR intention_level LIKE '%B%') GROUP BY name ORDER BY high_intent_count DESC LIMIT 1
-
 """
 
 dws_connect_test(query)

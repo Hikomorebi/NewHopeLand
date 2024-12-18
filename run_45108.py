@@ -6,9 +6,6 @@ import time
 import traceback
 from MateGen import MateGen
 import json
-import psycopg2
-from psycopg2.extras import RealDictCursor
-from generate_report import generate_json_report, query_customer_info
 from utils import (
     default_converter,
     query_tables_description,
@@ -116,11 +113,9 @@ def chat():
         print("显示当前所有会话id：")
         for m in mategen_dict.keys():
             print(m)
-        
+
         print("打印data内容：")
         print(data)
-
-
 
         # 获取用户输入的query字段
         query = data.get("query")
@@ -133,14 +128,17 @@ def chat():
         # "indicator_name = 'base'"表示基础问数
         process_user_input_dict = process_user_input(query)
 
-
         # 获取当前会话id
         session_id = data.get("session_id")
         is_new = True
         # 同时满足如下条件下不单开对话，1、session_id已存在 2、【基础问数,新指标，旧指标】中不是新指标 3、count小于等于5
         if session_id in mategen_dict:
             mategen = mategen_dict[session_id]
-            if process_user_input_dict.get("indicator_name",None) in [mategen.current_indicator,"base"] and mategen.current_count <= 10:
+            if (
+                process_user_input_dict.get("indicator_name", None)
+                in [mategen.current_indicator, "base"]
+                and mategen.current_count <= 10
+            ):
                 is_new = False
                 mategen.current_count += 1
             else:
@@ -176,11 +174,13 @@ def chat():
                 indicator_name = process_user_input_dict["indicator_name"]
                 if indicator_name in indicator_prompt_dict:
                     print("特殊指标！")
-                    chosen_tables = indicator_prompt_dict[indicator_name]['chosen_tables']
+                    chosen_tables = indicator_prompt_dict[indicator_name][
+                        "chosen_tables"
+                    ]
                 else:
                     chosen_tables = select_table_based_on_indicator(
                         process_user_input_dict["indicator_data"]["数据来源"],
-                        process_user_input_dict["indicator_data"]["数据来源表"]
+                        process_user_input_dict["indicator_data"]["数据来源表"],
                     )
                 print(f"选择的表是：{chosen_tables}")
             if chosen_tables is None:
@@ -196,14 +196,18 @@ def chat():
                 indicator_name = process_user_input_dict["indicator_name"]
 
                 if indicator_name in indicator_prompt_dict:
-                    with open(indicator_prompt_dict[indicator_name]['prompt'], 'r', encoding='utf-8') as file:
+                    with open(
+                        indicator_prompt_dict[indicator_name]["prompt"],
+                        "r",
+                        encoding="utf-8",
+                    ) as file:
                         special_indicator_prompt = file.read()
                     mategen = MateGen(
                         api_key=os.getenv("OPENAI_API_KEY"),
                         base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
                         model="qwen-plus",
                         system_content_list=[special_indicator_prompt],
-                        current_indicator=indicator_name
+                        current_indicator=indicator_name,
                     )
                 else:
                     system_prompt_indicator = system_prompt_indicator_template.format(
@@ -216,7 +220,7 @@ def chat():
                         base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
                         model="qwen-plus",
                         system_content_list=[system_prompt_indicator],
-                        current_indicator=indicator_name
+                        current_indicator=indicator_name,
                     )
             else:
                 few_shots = query_few_shots(used_tables)
@@ -228,7 +232,7 @@ def chat():
                     system_content_list=[
                         system_prompt_common.replace("<few_shots>", few_shots)
                     ],
-                    current_indicator="base"
+                    current_indicator="base",
                 )
             mategen_dict[session_id] = mategen
 
@@ -248,8 +252,10 @@ def chat():
         # chat函数
         chat_dict = mategen.chat(process_user_input_dict)
 
-        
-        chat_dict["time"] = f"\n第一阶段：对话准备（数据表选择）耗时: {elapsed_time:.4f} 秒" + chat_dict["time"]
+        chat_dict["time"] = (
+            f"\n第一阶段：对话准备（数据表选择）耗时: {elapsed_time:.4f} 秒"
+            + chat_dict["time"]
+        )
         if "chosen_tables" not in chat_dict:
             if is_new:
                 chat_dict["chosen_tables"] = chosen_tables
@@ -295,7 +301,7 @@ def chat():
             print(final_response)
             finish_info = {
                 "sql_code": chat_dict["sql_code"],
-                "column_names":chat_dict["column_names"],
+                "column_names": chat_dict["column_names"],
                 "sql_response": chat_dict["sql_results_json"],
                 "chosen_tables": chat_dict["chosen_tables"],
                 "time": chat_dict["time"],
@@ -309,60 +315,6 @@ def chat():
             return Response(generate_012(chat_dict), content_type="text/event-stream")
         else:
             return Response(generate_3(chat_dict), content_type="text/event-stream")
-
-    except Exception as e:
-        traceback.print_exc()
-        return jsonify({"status": "error", "response": str(e)})
-
-
-@app.route("/analysis", methods=["POST"])
-def analysis():
-    try:
-        data = request.json
-        # 获取传递的参数
-        saleropenid = data.get("saleropenid") 
-        roleid = data.get("roleId")
-        projectId = data.get("projectId")
-        start_date = data.get("start_date")
-        end_date = data.get("end_date")
-
-        if not all([roleid,projectId,start_date,end_date]):
-            return jsonify({
-                "status": "error",
-                "response": "缺少必要的参数",
-            })
-        
-        # 设置角色信息csv文件路径
-        csv_file_path ="./role.csv"
-        # 初始化客户信息列表
-        customer_data = []
-        # 如果是销售经理，查询所有下属的置业顾问的顾客信息
-        if roleid == "2015":
-            subordinate_ids = get_consultant_ids(projectId, csv_file_path)
-            # 遍历每个sub_id
-            for sub_id in subordinate_ids:
-                # 确保sub_id不为空
-                if sub_id:
-                    customers = query_customer_info(sub_id,start_date,end_date)  
-                    customer_data.extend(customers)
-        # 如果是置业顾问，只查询自己的顾客信息        
-        else:
-            customer_data = query_customer_info(saleropenid,start_date,end_date)
-
-        if not customer_data:
-            return jsonify({"status": "error", "response": "未查询到相关客户信息。"})
-
-        projectName = get_project_name(projectId,csv_file_path)
-        json_report = generate_json_report(customer_data,projectId,projectName)
-
-        report_filename = f"Reports/高意向客户分析报告_{saleropenid}.json"
-        with open(report_filename, "w", encoding="utf-8") as file:
-            # 美化输出JSON
-            json.dump(json_report, file, ensure_ascii=False, indent=4)
-
-        print(f"报告已生成并保存在 {report_filename}")
-
-        return jsonify({"status": "success", "response": json_report})
 
     except Exception as e:
         traceback.print_exc()
