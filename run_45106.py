@@ -13,8 +13,6 @@ from utils import (
     dict_intersection,
     process_user_input,
     select_table_based_on_indicator,
-    get_consultant_ids,
-    get_project_name,
 )
 from auto_select_tables import select_table_based_on_query
 

@@ -314,24 +314,6 @@ def get_translate_column_names(column_names):
             translated_column_names.append(column)
     return translated_column_names
 
-# 查询下属置业顾问的id
-def get_consultant_ids(project_id, csv_file_path):
-    consultant_ids = []
-    with open(csv_file_path, mode='r', encoding='utf-8') as file:
-        reader = csv.DictReader(file)
-        for row in reader:
-            if row['projectid'] == project_id and row['roleid'] == '2011':
-                consultant_ids.append(row['openid'])
-    return consultant_ids
-
-# 查询项目名称
-def get_project_name(project_id, csv_file_path):
-    with open(csv_file_path, mode='r', encoding='utf-8') as file:
-        reader = csv.DictReader(file)
-        for row in reader:
-            if row['projectid'] == project_id:
-                return row['projectname']
-    return None  # 如果没有找到匹配的项目ID，返回None
 
 # 连接到Navicat(Mysql)数据库
 def connect_to_db():
