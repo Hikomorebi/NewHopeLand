@@ -1,7 +1,6 @@
 # python3
 # -*- coding: utf-8 -*-
 from flask import Flask, Response, request, jsonify
-import os
 import time
 import traceback
 from MateGen import MateGen
@@ -18,8 +17,9 @@ from auto_select_tables import select_table_based_on_query
 
 app = Flask(__name__)
 
-# 设置环境变量（仅在当前脚本运行期间有效）
-os.environ["OPENAI_API_KEY"] = "sk-94987a750c924ae19693c9a9d7ea78f7"
+OPENAI_API_KEY = "sk-94987a750c924ae19693c9a9d7ea78f7"
+BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+MODEL_NAME = "qwen-plus"
 
 with open("indicator_prompt.json", "r", encoding="utf-8") as file:
     indicator_prompt_dict = json.load(file)
@@ -94,10 +94,12 @@ def close():
     print("******************************")
     if session_id in mategen_dict:
         del mategen_dict[session_id]
-        print(f"删除session_id:{session_id}")
+        print(f"已删除session_id:{session_id}")
+        print("******************************")
         return jsonify({"response": "已删除该会话"})
     else:
         print(f"没有该会话session_id:{session_id}")
+        print("******************************")
         return jsonify({"response": "不存在该会话"})
 
 
@@ -201,9 +203,9 @@ def chat():
                     ) as file:
                         special_indicator_prompt = file.read()
                     mategen = MateGen(
-                        api_key=os.getenv("OPENAI_API_KEY"),
-                        base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
-                        model="qwen-plus",
+                        api_key=OPENAI_API_KEY,
+                        base_url=BASE_URL,
+                        model=MODEL_NAME,
                         system_content_list=[special_indicator_prompt],
                         current_indicator=indicator_name,
                     )
@@ -214,9 +216,9 @@ def chat():
                         indicator_rule=indicator_data["计算规则"],
                     )
                     mategen = MateGen(
-                        api_key=os.getenv("OPENAI_API_KEY"),
-                        base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
-                        model="qwen-plus",
+                        api_key=OPENAI_API_KEY,
+                        base_url=BASE_URL,
+                        model=MODEL_NAME,
                         system_content_list=[system_prompt_indicator],
                         current_indicator=indicator_name,
                     )
@@ -224,9 +226,9 @@ def chat():
                 few_shots = query_few_shots(used_tables)
 
                 mategen = MateGen(
-                    api_key=os.getenv("OPENAI_API_KEY"),
-                    base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
-                    model="qwen-plus",
+                    api_key=OPENAI_API_KEY,
+                    base_url=BASE_URL,
+                    model=MODEL_NAME,
                     system_content_list=[
                         system_prompt_common.replace("<few_shots>", few_shots)
                     ],
