@@ -319,6 +319,9 @@ def chat():
     except Exception as e:
         traceback.print_exc()
         return jsonify({"status": "error", "response": str(e)})
-
-if __name__ == "__main__":
+    
+def my_run():
     app.run(threaded=True, host="0.0.0.0", port=45108)
+    
+if __name__ == "__main__":
+    my_run()

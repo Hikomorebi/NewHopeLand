@@ -1,6 +1,7 @@
 import psycopg2
 import pymysql
 import os
+import sys
 import json
 from datetime import date
 import re
@@ -314,6 +315,16 @@ def get_translate_column_names(column_names):
             translated_column_names.append(column)
     return translated_column_names
 
+def get_resource_path(relative_path):
+    """返回程序运行时的资源文件夹路径"""
+    if getattr(sys, 'frozen', False):
+        # 如果程序是通过 pyInstaller 打包的
+        base_path = os.path.dirname(sys.executable)
+    else:
+        # 如果程序是以源代码的方式运行的
+        base_path = os.path.dirname(__file__)
+    
+    return os.path.join(base_path, relative_path)
 
 # 连接到Navicat(Mysql)数据库
 def connect_to_db():

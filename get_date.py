@@ -2,7 +2,7 @@
 import os
 from openai import OpenAI
 import json
-
+from utils import get_resource_path
 # 设置环境变量（仅在当前脚本运行期间有效）
 os.environ["OPENAI_API_KEY"] = "sk-94987a750c924ae19693c9a9d7ea78f7"
 
@@ -12,8 +12,15 @@ client = OpenAI(
     base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
 )
 model = "qwen2.5-72b-instruct"
-with open("Database/Date.txt", "r", encoding="utf-8") as file:
+
+# 获取 Database 文件夹的路径
+database_path = get_resource_path('Database')
+# 加载 date.txt
+date_path = os.path.join(database_path, 'Date.txt')
+
+with open(date_path, "r", encoding="utf-8") as file:
     file_content =  file.read()
+
 get_data_prompt = f"""
 你是一个识别特殊日期的助手，提供如下的特殊日期供你参考：{file_content}；
 请将今年理解为2024年，若无特别指明，默认询问今年的特殊日期。请你根据用户的提问判断出用户的问题中是否涉及到特殊日期，如果用户的问题中并不涉及到特殊时间相关或者用户的提问你不知道属于什么特殊日期，请直接回答“无效输入”，无需回答其他任何内容。如果涉及到某一个特殊日期，请你按照以下JSON格式响应，无需生成其他内容：
