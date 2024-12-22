@@ -11,6 +11,7 @@ import torch
 from info import find_similar_customers
 from psycopg2 import pool
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from utils import get_resource_path
 
 # 创建连接池
 db_pool = pool.SimpleConnectionPool(
@@ -32,9 +33,16 @@ else:
 # 设置环境变量（仅在当前脚本运行期间有效）
 os.environ["OPENAI_API_KEY"] = "sk-94987a750c924ae19693c9a9d7ea78f7"
 
-with open('./Database/historical_data.pkl', 'rb') as file:
+# 获取 Database 文件夹的路径
+database_path = get_resource_path('Database')
+# 加载 historical_data.pkl
+historical_data_path = os.path.join(database_path, 'historical_data.pkl')
+# 加载 knowledge_base.pth
+knowledge_base_path = os.path.join(database_path, 'knowledge_base.pth')
+
+with open(historical_data_path, 'rb') as file:
     historical_data = pickle.load(file)
-knowledge_base = torch.load('./Database/knowledge_base.pth')
+knowledge_base = torch.load(knowledge_base_path)
 
 # 创建 OpenAI 客户端
 client = OpenAI(

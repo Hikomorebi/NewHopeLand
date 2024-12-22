@@ -3,6 +3,7 @@ from psycopg2.extras import RealDictCursor
 from transformers import AutoTokenizer, AutoModel
 import torch
 import pickle
+from utils import get_resource_path
 
 # 定义均值池化函数
 def mean_pooling(model_output, attention_mask):
@@ -10,9 +11,12 @@ def mean_pooling(model_output, attention_mask):
     input_mask_expanded = attention_mask.unsqueeze(-1).expand(token_embeddings.size()).float()
     return torch.sum(token_embeddings * input_mask_expanded, 1) / torch.clamp(input_mask_expanded.sum(1), min=1e-9)
 
-# 加载模型和分词器
-tokenizer = AutoTokenizer.from_pretrained('./models/paraphrase-MiniLM-L6-v2')
-model = AutoModel.from_pretrained('./models/paraphrase-MiniLM-L6-v2')
+# 获取 models 文件夹的路径
+models_path = get_resource_path('models')
+
+# 加载分词器和模型
+tokenizer = AutoTokenizer.from_pretrained(models_path + '/paraphrase-MiniLM-L6-v2')
+model = AutoModel.from_pretrained(models_path + '/paraphrase-MiniLM-L6-v2')
 
 # 连接数据库查询历史相似客户信息
 def query_history_customer_info():
@@ -23,7 +27,6 @@ def query_history_customer_info():
                                   client_encoding='UTF8',
                                   port="8000")
     print("连接DWS数据库成功！")
-
     try:
         with connection.cursor(cursor_factory=RealDictCursor) as cursor:
             sql = """
@@ -248,14 +251,4 @@ def find_similar_customers(new_description, embeddings, historical_data):
     most_similar_index = torch.argmax(similarities).item()
     return historical_data[most_similar_index]
 
-if __name__ == "__main__":
-    # 查询历史客户信息
-    historical_data = query_history_customer_info()
-    with open('./Database/historical_data.pkl', 'wb') as file:
-        pickle.dump(historical_data, file)
-    # 转换历史数据为自然语言描述
-    historical_descriptions = data_to_natural_language(historical_data)
 
-    # 将自然语言描述转换为向量
-    knowledge_base = convert_to_embeddings(historical_descriptions)
-    torch.save(knowledge_base, './Database/knowledge_base.pth')

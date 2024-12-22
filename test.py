@@ -1,74 +1,22 @@
-import psycopg2
-from psycopg2.extras import RealDictCursor
+import os
+import sys
 
-# 连接数据库查询客户信息
-def query_customer_info(start_date, end_date):
-    connection = psycopg2.connect(dbname="fdc_dc",
-                                  user="dws_user_hwai",
-                                  password="NewHope#1982@",
-                                  host="124.70.57.67",
-                                  client_encoding='UTF8',
-                                  port="8000")
-    print("连接DWS数据库成功！")
-
-    try:
-        with connection.cursor(cursor_factory=RealDictCursor) as cursor:
-            sql = """
-            WITH ranked_customers AS (
-                SELECT 
-                    u.id, u.createtime, u.username, u.age, u.familystructure, u.mobile, 
-                    u.qualified, u.visitcounts, u.budget, u.customerresource, u.mymttj, u.work, u.live, u.industry, u.jobs,
-                    u.house, u.purpose, u.floor, u.interest, u.userrank, u.memo , u.saleropenid,
-                    u.buyuse, u.dealway, u.channel, u.unitprice, u.customerchannel,  u.customer_id, u.income,
-                    u.area, u.visitamount, u.memo1, u.abandon_reason, u.notbuyreason, u.layouttype, u.buyfactor, u.interestlayout,
-                    ROW_NUMBER() OVER (PARTITION BY u.username, u.mobile ORDER BY u.createtime DESC) as row_num
-                FROM 
-                    fdc_ods.ods_qw_market_dh_crm_saleruser u
-                WHERE 
-                    u.projectid ='8194' AND u.createtime >= %s  AND u.createtime < %s
-                    AND u.partitiondate >= CURRENT_DATE - INTERVAL '1 day' AND u.partitiondate < CURRENT_DATE + INTERVAL '1 day'
-            )
-            SELECT 
-                id, createtime, username, age, familystructure, mobile, 
-                qualified, visitcounts, budget, customerresource, mymttj, work, live, industry, jobs,
-                house, purpose, floor, interest,  userrank, memo , saleropenid,
-                buyuse, dealway, channel, unitprice, customerchannel,  customer_id, income,
-                area, visitamount, memo1 , abandon_reason, notbuyreason, layouttype, buyfactor, interestlayout,
-                row_num
-            FROM 
-                ranked_customers
-            WHERE 
-                row_num = 1
-                ;
-            """
-            cursor.execute(sql, (start_date, end_date))
-            result = cursor.fetchall()
-            print("查询客户信息成功！")
-            return result
-    except Exception as e:
-        print(f"查询客户信息时出错: {e}")
-        return []
-    finally:
-        connection.close()
-
-# 示例调用
-start_date = '2023-05-11 00:00:00'
-end_date = '2023-05-11 23:59:59'
-customer_info = query_customer_info(start_date, end_date)
-
-# 统计不同saleropenid名下的数据条数
-saleropenid_counts = {}
-for customer in customer_info:
-    saleropenid = customer['saleropenid']
-    if saleropenid in saleropenid_counts:
-        saleropenid_counts[saleropenid] += 1
+def get_resource_path(relative_path):
+    """返回程序运行时的资源文件夹路径"""
+    if getattr(sys, 'frozen', False):
+        # 如果程序是通过 pyInstaller 打包的
+        base_path = os.path.dirname(sys.executable)
     else:
-        saleropenid_counts[saleropenid] = 1
+        # 如果程序是以源代码的方式运行的
+        base_path = os.path.dirname(__file__)
+    
+    return os.path.join(base_path, relative_path)
 
-# 打印统计结果
-for saleropenid, count in saleropenid_counts.items():
-    print(f"saleropenid {saleropenid} 查询结果中共有 {count} 条数据")
+# 获取 Database 和 models 文件夹的路径
+database_path = get_resource_path('Database')
+models_path = get_resource_path('models')
 
-# 计算并打印总数据条目数
-total_data_count = sum(saleropenid_counts.values())
-print(f"总共有 {total_data_count} 条数据条目")
+print(f"Database Path: {database_path}")
+print(f"Models Path: {models_path}")
+
+# 你可以在这里继续使用 database_path 和 models_path 来加载相应的文件

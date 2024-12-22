@@ -1,6 +1,7 @@
 import psycopg2
 import pymysql
 import os
+import sys
 import json
 from datetime import date
 import re
@@ -308,6 +309,17 @@ def get_translate_column_names(column_names):
         else:
             translated_column_names.append(column)
     return translated_column_names
+
+# 获取程序资源路径的函数
+def get_resource_path(relative_path):
+    """ 返回可执行文件或脚本文件所在的目录 + 相对路径 """
+    if getattr(sys, 'frozen', False):
+        # 如果是通过 pyInstaller 打包的
+        base_path = os.path.dirname(sys.executable)
+    else:
+        # 如果是以源代码的形式运行
+        base_path = os.path.dirname(__file__)
+    return os.path.join(base_path, relative_path)
 
 # 查询下属置业顾问的id
 def get_consultant_ids(project_id, csv_file_path):
