@@ -3,6 +3,7 @@ from psycopg2.extras import RealDictCursor
 from transformers import AutoTokenizer, AutoModel
 import torch
 import pickle
+import os
 from utils import get_resource_path
 
 # 定义均值池化函数
@@ -14,9 +15,10 @@ def mean_pooling(model_output, attention_mask):
 # 获取 models 文件夹的路径
 models_path = get_resource_path('models')
 
-# 加载分词器和模型
-tokenizer = AutoTokenizer.from_pretrained(models_path + '/paraphrase-MiniLM-L6-v2')
-model = AutoModel.from_pretrained(models_path + '/paraphrase-MiniLM-L6-v2')
+# 使用 os.path.join 拼接路径，确保路径格式正确
+model_name = 'paraphrase-MiniLM-L6-v2'
+tokenizer = AutoTokenizer.from_pretrained(os.path.join(models_path, model_name))
+model = AutoModel.from_pretrained(os.path.join(models_path, model_name))
 
 # 连接数据库查询历史相似客户信息
 def query_history_customer_info():
