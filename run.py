@@ -17,7 +17,7 @@ from auto_select_tables import select_table_based_on_query
 
 app = Flask(__name__)
 
-OPENAI_API_KEY = "sk-94987a750c924ae19693c9a9d7ea78f7"
+OPENAI_API_KEY = "sk-46632b8571664330b45695ba5256c30e"
 BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
 MODEL_NAME = "qwen-plus"
 

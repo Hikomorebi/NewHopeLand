@@ -6,7 +6,7 @@ import time
 
 def post_chat(query):
     # 接口地址
-    url = "http://me.ilisa.team:45105/chat"
+    url = "http://me.ilisa.team:45104/chat"
     headers = {"Content-Type": "application/json"}
     #data = {"session_id":"2","query": query,"dataSource":'{"fdc_dws":["dws_proj_room_totalsale_a_min"]}'}
     data = {"session_id":"5","query": query,"dataSource":''}
