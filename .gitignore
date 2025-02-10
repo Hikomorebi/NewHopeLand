@@ -2,7 +2,5 @@ __pycache__
 .idea
 dist
 build
-dist
-build
 my_run.spec
 Dockerfile
