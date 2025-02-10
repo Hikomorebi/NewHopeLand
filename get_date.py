@@ -2,16 +2,16 @@
 import os
 from openai import OpenAI
 import json
-from utils import get_resource_path
-# 设置环境变量（仅在当前脚本运行期间有效）
-os.environ["OPENAI_API_KEY"] = "sk-94987a750c924ae19693c9a9d7ea78f7"
+from utils import (get_resource_path,
+                   load_configuration)
 
+OPENAI_API_KEY, BASE_URL, MODEL_NAME = load_configuration()
 # 创建 OpenAI 客户端
 client = OpenAI(
-    api_key=os.getenv("OPENAI_API_KEY"),
-    base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+    api_key=OPENAI_API_KEY,
+    base_url= BASE_URL
 )
-model = "qwen2.5-72b-instruct"
+model = MODEL_NAME
 
 # 获取 Database 文件夹的路径
 database_path = get_resource_path('Database')

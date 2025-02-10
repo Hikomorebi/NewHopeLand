@@ -39,9 +39,28 @@ user:{user_question}
 要求只返回最终的json对象，不要包含其余内容。
 """
 
-# 设置环境变量（仅在当前脚本运行期间有效）
-os.environ["OPENAI_API_KEY"] = "sk-94987a750c924ae19693c9a9d7ea78f7"
+# # 设置环境变量（仅在当前脚本运行期间有效）
+# os.environ["OPENAI_API_KEY"] = "sk-94987a750c924ae19693c9a9d7ea78f7"
 
+# 保存配置信息到文件
+def save_configuration(api_key, base_url, model_name):
+    config = {
+        "api_key": api_key,
+        "base_url": base_url,
+        "model_name": model_name
+    }
+    with open("config.json", "w") as f:
+        json.dump(config, f)
+
+# 从文件中读取配置信息
+def load_configuration():
+    try:
+        with open("config.json", "r") as f:
+            config = json.load(f)
+            return config["api_key"], config["base_url"], config["model_name"]
+    except FileNotFoundError:
+        return None, None, None
+    
 with open("indicator_map.json", "r", encoding="utf-8") as file:
     indicator_map = json.load(file)
 with open("en2ch.json", "r", encoding="utf-8") as file:
