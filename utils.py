@@ -60,6 +60,8 @@ def load_configuration():
             return config["api_key"], config["base_url"], config["model_name"]
     except FileNotFoundError:
         return None, None, None
+
+OPENAI_API_KEY, BASE_URL, MODEL_NAME = load_configuration()
     
 with open("indicator_map.json", "r", encoding="utf-8") as file:
     indicator_map = json.load(file)

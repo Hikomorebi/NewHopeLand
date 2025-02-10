@@ -2,7 +2,7 @@ import requests
 import json
 
 # 配置信息
-api_key = "sk-9a9538a6e032437ebfb73a5ac17debc4"
+api_key = "sk-46632b8571664330b45695ba5256c30e"
 base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1"
 model_name = "qwen-plus"
 
