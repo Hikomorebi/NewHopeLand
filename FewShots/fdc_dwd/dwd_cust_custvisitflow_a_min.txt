@@ -10,7 +10,7 @@
 问题：上个月成都有哪些客户来访？
 回答：
 {
-    "thoughts": "我们需要提取该表中的 custname、mobilephone、visitdate、projname 等字段。根据表的说明，projname 包含城市名，因此可以通过 projname LIKE '%成都%' 进行筛选。查询时需要使用 partitiondate = current_date 来确保查询的是当前分区数据，同时需要筛选时间为上个月的数据。",
+    "thoughts": "我们需要提取该表中的 custname、mobilephone、visitdate、projname 等字段。根据表的说明，projname 包含城市名，因此可以通过 projname LIKE '%成都%' 进行筛选。查询时需要使用 partitiondate = current_date 来确保查询的是当前分区数据，同时需要通过date_trunc来提取上个月的时间范围数据。",
     "sql": "SELECT custname, mobilephone, visitdate, projname FROM fdc_dwd.dwd_cust_custvisitflow_a_min WHERE projname LIKE '%成都%' AND partitiondate = current_date AND visitdate::timestamp >= date_trunc('month', current_date - interval '1 month') AND visitdate::timestamp < date_trunc('month', current_date) ORDER BY visitdate;",
     "key_fields": "custname, mobilephone, visitdate",
     "display_type": "response_bar_chart"

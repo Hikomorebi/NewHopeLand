@@ -29,14 +29,40 @@ assistant:
 {{
     "indicator":"无关指标"
 }}
+user:目前有多少客户处于认购状态？
+assistant:
+{{
+    "indicator":"无关指标"
+}}
 现在销售人员提问：
 user:{user_question}
 要求只返回最终的json对象，不要包含其余内容。
 """
 
-# 设置环境变量（仅在当前脚本运行期间有效）
-os.environ["OPENAI_API_KEY"] = "sk-94987a750c924ae19693c9a9d7ea78f7"
+# # 设置环境变量（仅在当前脚本运行期间有效）
+# os.environ["OPENAI_API_KEY"] = "sk-94987a750c924ae19693c9a9d7ea78f7"
 
+# 保存配置信息到文件
+def save_configuration(api_key, base_url, model_name):
+    config = {
+        "api_key": api_key,
+        "base_url": base_url,
+        "model_name": model_name
+    }
+    with open("config.json", "w") as f:
+        json.dump(config, f)
+
+# 从文件中读取配置信息
+def load_configuration():
+    try:
+        with open("config.json", "r") as f:
+            config = json.load(f)
+            return config["api_key"], config["base_url"], config["model_name"]
+    except FileNotFoundError:
+        return None, None, None
+
+OPENAI_API_KEY, BASE_URL, MODEL_NAME = load_configuration()
+    
 with open("indicator_map.json", "r", encoding="utf-8") as file:
     indicator_map = json.load(file)
 with open("en2ch.json", "r", encoding="utf-8") as file:
@@ -292,8 +318,8 @@ def get_translate_column_names(column_names):
     """
     final_prompt = prompt_template.replace("<input>", str(need_translate_list))
     client = OpenAI(
-        api_key=os.getenv("OPENAI_API_KEY"),
-        base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+        api_key=OPENAI_API_KEY,
+        base_url= BASE_URL
     )
     response = client.chat.completions.create(
         model="qwen-plus",
@@ -310,35 +336,16 @@ def get_translate_column_names(column_names):
             translated_column_names.append(column)
     return translated_column_names
 
-# 获取程序资源路径的函数
 def get_resource_path(relative_path):
-    """ 返回可执行文件或脚本文件所在的目录 + 相对路径 """
+    """返回程序运行时的资源文件夹路径"""
     if getattr(sys, 'frozen', False):
-        # 如果是通过 pyInstaller 打包的
+        # 如果程序是通过 pyInstaller 打包的
         base_path = os.path.dirname(sys.executable)
     else:
-        # 如果是以源代码的形式运行
+        # 如果程序是以源代码的方式运行的
         base_path = os.path.dirname(__file__)
+    
     return os.path.join(base_path, relative_path)
-
-# 查询下属置业顾问的id
-def get_consultant_ids(project_id, csv_file_path):
-    consultant_ids = []
-    with open(csv_file_path, mode='r', encoding='utf-8') as file:
-        reader = csv.DictReader(file)
-        for row in reader:
-            if row['projectid'] == project_id and row['roleid'] == '2011':
-                consultant_ids.append(row['openid'])
-    return consultant_ids
-
-# 查询项目名称
-def get_project_name(project_id, csv_file_path):
-    with open(csv_file_path, mode='r', encoding='utf-8') as file:
-        reader = csv.DictReader(file)
-        for row in reader:
-            if row['projectid'] == project_id:
-                return row['projectname']
-    return None  # 如果没有找到匹配的项目ID，返回None
 
 # 连接到Navicat(Mysql)数据库
 def connect_to_db():
@@ -413,10 +420,10 @@ def match_indicator(query, indicator_names):
 def fuzzy_match_indicator(query, indicator_names):
     # 创建 OpenAI 客户端并设定模型
     client = OpenAI(
-        api_key=os.getenv("OPENAI_API_KEY"),
-        base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+    api_key=OPENAI_API_KEY,
+    base_url= BASE_URL
     )
-    model = "qwen-plus"
+    model = MODEL_NAME
 
     # 构建模型提示
     indicator_names_str = "\n".join([f"- {indicator}" for indicator in indicator_names])
@@ -636,24 +643,24 @@ def dws_connect(sql_query,key_fields=None,display_type="response_bar_chart"):
             results = [row for row in results if None not in row]
 
             numeric_types = {1700, 700, 701, 23, 20}
+            if any(one_col.type_code in numeric_types for one_col in column_description):
+                # 遍历结果集并检查条件
+                rows_to_delete = []  # 保存需要删除的行的索引
+                for row_index, row in enumerate(results):
+                    all_zero = True  # 标志是否所有数值列都为0
+                    for col_index, col in enumerate(row):
+                        # 获取列的type_code
+                        col_type_code = column_description[col_index].type_code
+                        if col_type_code in numeric_types:  # 如果是数值类型
+                            if col != 0:  # 如果该列不为0
+                                all_zero = False
+                                break  # 该行不满足条件，跳出循环
+                    if all_zero:
+                        rows_to_delete.append(row_index)
 
-            # 遍历结果集并检查条件
-            rows_to_delete = []  # 保存需要删除的行的索引
-            for row_index, row in enumerate(results):
-                all_zero = True  # 标志是否所有数值列都为0
-                for col_index, col in enumerate(row):
-                    # 获取列的type_code
-                    col_type_code = column_description[col_index].type_code
-                    if col_type_code in numeric_types:  # 如果是数值类型
-                        if col != 0:  # 如果该列不为0
-                            all_zero = False
-                            break  # 该行不满足条件，跳出循环
-                if all_zero:
-                    rows_to_delete.append(row_index)
-
-            # 删除满足条件的行
-            for row_index in reversed(rows_to_delete):  # 反向删除，避免修改索引问题
-                results.pop(row_index)
+                # 删除满足条件的行
+                for row_index in reversed(rows_to_delete):  # 反向删除，避免修改索引问题
+                    results.pop(row_index)
 
 
             results_length = len(results)

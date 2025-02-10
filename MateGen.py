@@ -13,6 +13,7 @@ from utils import (
     get_indicator_data_dictionary,
     force_matching
 )
+from get_date import get_enhanced_query
 import json
 
 system_prompt_indicator_template = """
@@ -117,6 +118,10 @@ class MateGen:
         chat_dict = {"time":"\n"}
         if process_user_input_dict is not None:
             question = process_user_input_dict['user_question']
+
+            question = get_enhanced_query(question)
+            print(f"修改问题为{question}")
+
             user_message = {"role": "user", "content": question}
             self.messages.messages_append(user_message)
             before_get_sql = time.time()

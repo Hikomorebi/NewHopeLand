@@ -16,7 +16,7 @@
         "prompt":"SystemPrompts/visitgroup.txt"
     },
     "新增认购":{
-        "chosen_tables":{"fdc_dwd":["dwd_trade_roomsubscr_a_min"],"fdc_ads":["view_proj_equity_his"]},
+        "chosen_tables":{"fdc_dwd":["dwd_trade_roomsubscr_a_min"],"fdc_ads":["view_proj_equity_his"],"fdc_dws":["dws_proj_room_totalsale_a_min"]},
         "prompt":"SystemPrompts/newsign.txt"
     },
     "认购金额":{
@@ -34,5 +34,9 @@
     "首复访客户数":{
         "chosen_tables":{"fdc_dwd":["dwd_cust_custvisitflow_a_min"]},
         "prompt":"SystemPrompts/visitornum.txt"
+    },
+    "高意向":{
+        "chosen_tables":{"fdc_ods":["ods_hwy_ai_nh_high_intent_report_a_d"]},
+        "prompt":"SystemPrompts/highintend.txt"
     }
 }

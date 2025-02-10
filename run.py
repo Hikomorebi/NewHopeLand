@@ -1,14 +1,10 @@
 # python3
 # -*- coding: utf-8 -*-
 from flask import Flask, Response, request, jsonify
-import os
 import time
 import traceback
 from MateGen import MateGen
 import json
-import psycopg2
-from psycopg2.extras import RealDictCursor
-from generate_report import generate_json_report, query_customer_info
 from utils import (
     default_converter,
     query_tables_description,
@@ -16,15 +12,22 @@ from utils import (
     dict_intersection,
     process_user_input,
     select_table_based_on_indicator,
-    get_consultant_ids,
-    get_project_name,
+    save_configuration,
+    load_configuration,
 )
 from auto_select_tables import select_table_based_on_query
 
 app = Flask(__name__)
 
-# 设置环境变量（仅在当前脚本运行期间有效）
-os.environ["OPENAI_API_KEY"] = "sk-94987a750c924ae19693c9a9d7ea78f7"
+# OPENAI_API_KEY = "sk-9a9538a6e032437ebfb73a5ac17debc4"
+# BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+# MODEL_NAME = "qwen-plus"
+OPENAI_API_KEY, BASE_URL, MODEL_NAME = load_configuration()
+
+if OPENAI_API_KEY and BASE_URL and MODEL_NAME:
+    print("配置已从文件加载。")
+else:
+    print("未找到配置信息。请使用 /configure 接口进行配置。")
 
 with open("indicator_prompt.json", "r", encoding="utf-8") as file:
     indicator_prompt_dict = json.load(file)
@@ -35,7 +38,7 @@ system_prompt_common = """
 2. 只能使用提供的数据字典信息生成正确的 PostgreSQL 语句。请生成完整的、可执行的SQL语句，确保所有字段和条件都使用具体的值，禁止包含任何形式的占位符或模板变量，禁止随意假设不存在的信息。
 3. 在生成SQL时，请注意不要混淆表与列之间的关系。确保选择的表和列与用户的请求相匹配。
 4. 请确保SQL的正确性，包括语法、表名、列名以及日期格式等。同时，确保查询在正确条件下的性能优化。
-5. 如果用户请求的是一段时间内的数据，请确保SQL语句能够正确提取这段时间内的数据。如询问当日的数据，可以使用 current_date 作为筛选条件。如果问题涉及到今年或者本月，请自动理解为当前时间为2024年12月。
+5. 如果用户请求的是一段时间内的数据，请确保SQL语句能够正确提取这段时间内的数据。若询问相对时间如当日、本周、本月、昨日、上周、上月的数据，可以使用 current_date 结合 date_trunc 作为筛选条件。如果问题涉及具体月份，请自动理解为当前时间为2024年12月。
 6. 生成的SQL语句不能涵盖非法字符如"\n"。
 7. 生成的SQL语句选择的字段分为核心字段和相关字段，核心字段是与用户需求连接最紧密的字段，相关字段是与用户需求相关的其他字段，用于确保信息的完整性。请将核心字段放入返回要求格式的 key_fields 参数值中。
 8. 请从如下给出的展示方式种选择最优的一种用以进行数据渲染，将类型名称放入返回要求格式的 display_type 参数值中，可用数据展示方式如下:
@@ -64,8 +67,7 @@ system_prompt_indicator_template = """
 2. 请完全按照提供的计算规则模板来设计SQL语句，可以根据问题增加具体的筛选条件，但不要修改计算规则的逻辑。如果计算规则中带有'$'符号作为占位符，需要从用户问题中提取相关的时间等信息来填充占位符。请确保所有占位符都被具体的值填充。
 3. 请确保所有字段和条件都使用具体的值。禁止随意假设不存在的信息。请务必确保生成的SQL语句能够直接运行。
 4. 如果计算规则中存在 partitiondate 字段，则将该字段值筛选条件设为 current_date 。
-5. 如果用户请求的是一段时间内的数据，请确保SQL语句能够正确提取这段时间内的数据。如询问当日的数据，可以使用 current_date 作为筛选条件。
-6. 如果问题涉及到相对时间，如今年、当月，请按照当前时间为 2024 年 12 月份进行计算。
+5. 如果用户请求的是一段时间内的数据，请确保SQL语句能够正确提取这段时间内的数据。若询问相对时间如当日、本周、本月、昨日、上周、上月的数据，可以使用 current_date 结合 date_trunc 作为筛选条件。如果问题涉及具体月份，请自动理解为当前时间为2024年12月。
 请严格按照计算规则的逻辑给出SQL代码，并按照以下JSON格式响应：
 {{
     "sql": "SQL Query to run",
@@ -92,6 +94,20 @@ all_tables = {
 
 print("Flask 启动！")
 
+# 在 /configure 接口中保存配置
+@app.route("/configure", methods=["POST"])
+def configure():
+    data = request.json
+    api_key = data.get("api_key")
+    base_url = data.get("base_url")
+    model_name = data.get("model_name")
+
+    if not all([api_key, base_url, model_name]):
+        return jsonify({"error": "缺少必要的配置参数"}), 400
+
+    # 保存配置到文件
+    save_configuration(api_key, base_url, model_name)
+    return jsonify({"message": "配置成功"}), 200
 
 @app.route("/close", methods=["POST"])
 def close():
@@ -100,12 +116,13 @@ def close():
     print("******************************")
     if session_id in mategen_dict:
         del mategen_dict[session_id]
-        print(f"删除session_id:{session_id}")
+        print(f"已删除session_id:{session_id}")
+        print("******************************")
         return jsonify({"response": "已删除该会话"})
     else:
         print(f"没有该会话session_id:{session_id}")
+        print("******************************")
         return jsonify({"response": "不存在该会话"})
-
 
 @app.route("/chat", methods=["POST"])
 def chat():
@@ -117,11 +134,9 @@ def chat():
         print("显示当前所有会话id：")
         for m in mategen_dict.keys():
             print(m)
-        
+
         print("打印data内容：")
         print(data)
-
-
 
         # 获取用户输入的query字段
         query = data.get("query")
@@ -134,14 +149,17 @@ def chat():
         # "indicator_name = 'base'"表示基础问数
         process_user_input_dict = process_user_input(query)
 
-
         # 获取当前会话id
         session_id = data.get("session_id")
         is_new = True
         # 同时满足如下条件下不单开对话，1、session_id已存在 2、【基础问数,新指标，旧指标】中不是新指标 3、count小于等于5
         if session_id in mategen_dict:
             mategen = mategen_dict[session_id]
-            if process_user_input_dict.get("indicator_name",None) in [mategen.current_indicator,"base"] and mategen.current_count <= 5:
+            if (
+                process_user_input_dict.get("indicator_name", None)
+                in [mategen.current_indicator, "base"]
+                and mategen.current_count <= 10
+            ):
                 is_new = False
                 mategen.current_count += 1
             else:
@@ -177,11 +195,13 @@ def chat():
                 indicator_name = process_user_input_dict["indicator_name"]
                 if indicator_name in indicator_prompt_dict:
                     print("特殊指标！")
-                    chosen_tables = indicator_prompt_dict[indicator_name]['chosen_tables']
+                    chosen_tables = indicator_prompt_dict[indicator_name][
+                        "chosen_tables"
+                    ]
                 else:
                     chosen_tables = select_table_based_on_indicator(
                         process_user_input_dict["indicator_data"]["数据来源"],
-                        process_user_input_dict["indicator_data"]["数据来源表"]
+                        process_user_input_dict["indicator_data"]["数据来源表"],
                     )
                 print(f"选择的表是：{chosen_tables}")
             if chosen_tables is None:
@@ -197,14 +217,18 @@ def chat():
                 indicator_name = process_user_input_dict["indicator_name"]
 
                 if indicator_name in indicator_prompt_dict:
-                    with open(indicator_prompt_dict[indicator_name]['prompt'], 'r', encoding='utf-8') as file:
+                    with open(
+                        indicator_prompt_dict[indicator_name]["prompt"],
+                        "r",
+                        encoding="utf-8",
+                    ) as file:
                         special_indicator_prompt = file.read()
                     mategen = MateGen(
-                        api_key=os.getenv("OPENAI_API_KEY"),
-                        base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
-                        model="qwen-plus",
+                        api_key=OPENAI_API_KEY,
+                        base_url=BASE_URL,
+                        model=MODEL_NAME,
                         system_content_list=[special_indicator_prompt],
-                        current_indicator=indicator_name
+                        current_indicator=indicator_name,
                     )
                 else:
                     system_prompt_indicator = system_prompt_indicator_template.format(
@@ -213,23 +237,23 @@ def chat():
                         indicator_rule=indicator_data["计算规则"],
                     )
                     mategen = MateGen(
-                        api_key=os.getenv("OPENAI_API_KEY"),
-                        base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
-                        model="qwen-plus",
+                        api_key=OPENAI_API_KEY,
+                        base_url=BASE_URL,
+                        model=MODEL_NAME,
                         system_content_list=[system_prompt_indicator],
-                        current_indicator=indicator_name
+                        current_indicator=indicator_name,
                     )
             else:
                 few_shots = query_few_shots(used_tables)
 
                 mategen = MateGen(
-                    api_key=os.getenv("OPENAI_API_KEY"),
-                    base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
-                    model="qwen-plus",
+                    api_key=OPENAI_API_KEY,
+                    base_url=BASE_URL,
+                    model=MODEL_NAME,
                     system_content_list=[
                         system_prompt_common.replace("<few_shots>", few_shots)
                     ],
-                    current_indicator="base"
+                    current_indicator="base",
                 )
             mategen_dict[session_id] = mategen
 
@@ -249,8 +273,10 @@ def chat():
         # chat函数
         chat_dict = mategen.chat(process_user_input_dict)
 
-        
-        chat_dict["time"] = f"\n第一阶段：对话准备（数据表选择）耗时: {elapsed_time:.4f} 秒" + chat_dict["time"]
+        chat_dict["time"] = (
+            f"\n第一阶段：对话准备（数据表选择）耗时: {elapsed_time:.4f} 秒"
+            + chat_dict["time"]
+        )
         if "chosen_tables" not in chat_dict:
             if is_new:
                 chat_dict["chosen_tables"] = chosen_tables
@@ -296,7 +322,7 @@ def chat():
             print(final_response)
             finish_info = {
                 "sql_code": chat_dict["sql_code"],
-                "column_names":chat_dict["column_names"],
+                "column_names": chat_dict["column_names"],
                 "sql_response": chat_dict["sql_results_json"],
                 "chosen_tables": chat_dict["chosen_tables"],
                 "time": chat_dict["time"],
@@ -315,59 +341,8 @@ def chat():
         traceback.print_exc()
         return jsonify({"status": "error", "response": str(e)})
 
-
-@app.route("/analysis", methods=["POST"])
-def analysis():
-    try:
-        data = request.json
-        # 获取传递的参数
-        saleropenid = data.get("saleropenid") 
-        roleid = data.get("roleId")
-        projectId = data.get("projectId")
-        start_date = data.get("start_date")
-        end_date = data.get("end_date")
-
-        if not all([roleid,projectId,start_date,end_date]):
-            return jsonify({
-                "status": "error",
-                "response": "缺少必要的参数",
-            })
-        
-        # 设置角色信息csv文件路径
-        csv_file_path ="./role.csv"
-        # 初始化客户信息列表
-        customer_data = []
-        # 如果是销售经理，查询所有下属的置业顾问的顾客信息
-        if roleid == "2015":
-            subordinate_ids = get_consultant_ids(projectId, csv_file_path)
-            # 遍历每个sub_id
-            for sub_id in subordinate_ids:
-                # 确保sub_id不为空
-                if sub_id:
-                    customers = query_customer_info(sub_id.strip(),start_date,end_date)  
-                    customer_data.extend(customers)
-        # 如果是置业顾问，只查询自己的顾客信息        
-        else:
-            customer_data = query_customer_info(saleropenid,start_date,end_date)
-
-        if not customer_data:
-            return jsonify({"status": "error", "response": "未查询到相关客户信息。"})
-
-        projectName = get_project_name(projectId,csv_file_path)
-        json_report = generate_json_report(customer_data,projectId,projectName)
-
-        report_filename = f"Reports/高意向客户分析报告_{saleropenid}.json"
-        with open(report_filename, "w", encoding="utf-8") as file:
-            # 美化输出JSON
-            json.dump(json_report, file, ensure_ascii=False, indent=4)
-
-        print(f"报告已生成并保存在 {report_filename}")
-
-        return jsonify({"status": "success", "response": json_report})
-
-    except Exception as e:
-        traceback.print_exc()
-        return jsonify({"status": "error", "response": str(e)})
-
-if __name__ == "__main__":
+def run():
     app.run(threaded=True, host="0.0.0.0", port=45104)
+    
+if __name__ == "__main__":
+    run()

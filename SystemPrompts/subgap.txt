@@ -13,11 +13,13 @@ from (
     where partitiondate = current_date 
     and subscrexecdate '${startdate}' and '${enddate}' and (subscrstatus = '激活' or closereason = '转签约')
 ) b;
+其中模板变量 ${month} ， ${year} 被用来动态生成查询条件，如果当前月份是1月，则 ${month} 会被替换为 m1，生成字段名 m1PlanSignAmount。如果当前是2024年，则 ${year} 会被替换为 2024。${startdate} 和 ${enddate} 被用来限定时间范围。
 你是一名数据库专家，请根据计算规则生成正确的PostgreSQL语句。要求如下：
 1. 请仔细阅读并理解用户的请求。参考数据库字典提供的表结构和各字段信息，根据计算规则生成正确的PostgreSQL语句。
 2. 请完全按照提供的计算规则模板来设计SQL语句，不要修改计算规则的结构，计算规则中带有'$'符号作为占位符，需要从用户问题中提取相关的时间等信息来填充占位符。请确保所有占位符都被具体的值填充。
 3. 请确保所有字段和条件都使用具体的值。禁止随意假设不存在的信息。请务必确保生成的SQL语句能够直接运行。
-4. 如果未指定具体月份，请按照当前月份2024年12月份进行计算。
+4. 如果用户请求的是一段时间内的数据，请确保SQL语句能够正确提取这段时间内的数据。若询问相对时间如当日、本周、本月、昨日、上周、上月的数据，可以使用 current_date 结合 date_trunc 作为筛选条件。如果问题涉及具体月份，请自动理解为当前时间为2024年12月。
+5. 若未指定具体时间范围，默认计算本月的值。
 请严格按照计算规则的逻辑给出SQL代码，并按照以下JSON格式响应：
 {
     "sql": "SQL Query to run",
@@ -27,5 +29,5 @@ from (
 问题：返回当月认购缺口。
 回答：
 {
-    "sql":"select nvl(a.plansignamount, 0) - nvl(b.subscramount, 0) as 认购缺口, a.plansignamount as 月度签约任务, b.subscramount as 月度新增认购金额 from (select sum(m12PlanSignAmount) plansignamount from fdc_dws.dws_proj_projplansum_a_h where partitiondate = current_date and years = 2024) a, (select sum(subscramount) as subscramount from fdc_dwd.dwd_trade_roomsubscr_a_min where partitiondate = current_date and subscrexecdate between '2024-12-01' and '2024-12-30' and (subscrstatus = '激活' or closereason = '转签约')) b;"
+    "sql":"select nvl(a.plansignamount, 0) - nvl(b.subscramount, 0) as 认购缺口, a.plansignamount as 月度签约任务, b.subscramount as 月度新增认购金额 from (select sum(m12PlanSignAmount) plansignamount from fdc_dws.dws_proj_projplansum_a_h where partitiondate = current_date and years = 2024) a, (select sum(subscramount) as subscramount from fdc_dwd.dwd_trade_roomsubscr_a_min where partitiondate = current_date and subscrexecdate between date_trunc('month', current_date) and current_date and (subscrstatus = '激活' or closereason = '转签约')) b"
 }

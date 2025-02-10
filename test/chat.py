@@ -6,7 +6,9 @@ import time
 
 def post_chat(query):
     # 接口地址
-    url = "http://me.ilisa.team:45108/chat"
+    # url = "http://me.ilisa.team:45105/chat"
+    # url = "http://47.109.178.240:45108/chat" #服务器端
+    url = "http://127.0.0.1:45109/chat" #客户端
     headers = {"Content-Type": "application/json"}
     #data = {"session_id":"2","query": query,"dataSource":'{"fdc_dws":["dws_proj_room_totalsale_a_min"]}'}
     data = {"session_id":"5","query": query,"dataSource":''}
@@ -86,4 +88,4 @@ def post_chat(query):
 # 6
 #post_chat("今年双十一期间的新增认购")
 #post_chat("与去年同期相差多少")
-post_chat("本月璐麟品项目的来访情况如何？")
+post_chat("今年中秋期间的新增认购")

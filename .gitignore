@@ -1,5 +1,8 @@
 __pycache__
 .idea
-Reports
 dist
 build
+dist
+build
+my_run.spec
+Dockerfile
