@@ -4,7 +4,7 @@ from openai import OpenAI
 import json
 from utils import get_resource_path
 # 设置环境变量（仅在当前脚本运行期间有效）
-os.environ["OPENAI_API_KEY"] = "sk-94987a750c924ae19693c9a9d7ea78f7"
+os.environ["OPENAI_API_KEY"] = "sk-46632b8571664330b45695ba5256c30e"
 
 # 创建 OpenAI 客户端
 client = OpenAI(
