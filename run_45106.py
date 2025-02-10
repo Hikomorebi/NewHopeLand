@@ -12,14 +12,22 @@ from utils import (
     dict_intersection,
     process_user_input,
     select_table_based_on_indicator,
+    save_configuration,
+    load_configuration,
 )
 from auto_select_tables import select_table_based_on_query
 
 app = Flask(__name__)
 
-OPENAI_API_KEY = "sk-94987a750c924ae19693c9a9d7ea78f7"
-BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
-MODEL_NAME = "qwen-plus"
+# OPENAI_API_KEY = "sk-9a9538a6e032437ebfb73a5ac17debc4"
+# BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+# MODEL_NAME = "qwen-plus"
+OPENAI_API_KEY, BASE_URL, MODEL_NAME = load_configuration()
+
+if OPENAI_API_KEY and BASE_URL and MODEL_NAME:
+    print("配置已从文件加载。")
+else:
+    print("未找到配置信息。请使用 /configure 接口进行配置。")
 
 with open("indicator_prompt.json", "r", encoding="utf-8") as file:
     indicator_prompt_dict = json.load(file)
@@ -86,6 +94,20 @@ all_tables = {
 
 print("Flask 启动！")
 
+# 在 /configure 接口中保存配置
+@app.route("/configure", methods=["POST"])
+def configure():
+    data = request.json
+    api_key = data.get("api_key")
+    base_url = data.get("base_url")
+    model_name = data.get("model_name")
+
+    if not all([api_key, base_url, model_name]):
+        return jsonify({"error": "缺少必要的配置参数"}), 400
+
+    # 保存配置到文件
+    save_configuration(api_key, base_url, model_name)
+    return jsonify({"message": "配置成功"}), 200
 
 @app.route("/close", methods=["POST"])
 def close():
@@ -101,7 +123,6 @@ def close():
         print(f"没有该会话session_id:{session_id}")
         print("******************************")
         return jsonify({"response": "不存在该会话"})
-
 
 @app.route("/chat", methods=["POST"])
 def chat():
@@ -320,5 +341,8 @@ def chat():
         traceback.print_exc()
         return jsonify({"status": "error", "response": str(e)})
 
-if __name__ == "__main__":
+def run():
     app.run(threaded=True, host="0.0.0.0", port=45106)
+    
+if __name__ == "__main__":
+    run()

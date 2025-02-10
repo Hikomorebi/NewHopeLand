@@ -316,8 +316,8 @@ def get_translate_column_names(column_names):
     """
     final_prompt = prompt_template.replace("<input>", str(need_translate_list))
     client = OpenAI(
-        api_key=os.getenv("OPENAI_API_KEY"),
-        base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+        api_key=OPENAI_API_KEY,
+        base_url= BASE_URL
     )
     response = client.chat.completions.create(
         model="qwen-plus",
@@ -418,10 +418,10 @@ def match_indicator(query, indicator_names):
 def fuzzy_match_indicator(query, indicator_names):
     # 创建 OpenAI 客户端并设定模型
     client = OpenAI(
-        api_key=os.getenv("OPENAI_API_KEY"),
-        base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+    api_key=OPENAI_API_KEY,
+    base_url= BASE_URL
     )
-    model = "qwen-plus"
+    model = MODEL_NAME
 
     # 构建模型提示
     indicator_names_str = "\n".join([f"- {indicator}" for indicator in indicator_names])
