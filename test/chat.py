@@ -77,7 +77,7 @@ def post_chat(query):
 #post_chat("云境项目的认签达成进度")
 
 # 4
-#post_chat("本月签约达成率")
+# post_chat("本月签约达成率")
 
 # 5
 #post_chat("国庆期间的来访人数有多少？")
@@ -88,4 +88,4 @@ def post_chat(query):
 # 6
 #post_chat("今年双十一期间的新增认购")
 #post_chat("与去年同期相差多少")
-post_chat("今年中秋期间的新增认购")
+# post_chat("今年中秋期间的新增认购")

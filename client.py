@@ -6,8 +6,8 @@ import json
 app = Flask(__name__)
 
 # 服务端地址
-# SERVER_URL = "http://47.109.178.240:45108"  
-SERVER_URL = "http://localhost:45108"  
+SERVER_URL = "http://47.109.178.240:45108"  
+  
 # 转发 /configure 请求到服务端
 @app.route("/configure", methods=["POST"])
 def configure():
