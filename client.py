@@ -1,7 +1,8 @@
 # client.py
 from flask import Flask, Response, request, jsonify
 import requests
-import json
+import traceback
+from utils import dws_connect
 
 app = Flask(__name__)
 
@@ -14,6 +15,23 @@ def configure():
     data = request.json
     response = requests.post(f"{SERVER_URL}/configure", json=data)
     return jsonify(response.json()), response.status_code
+
+@app.route("/execute_sql", methods=["POST"])
+def execute_sql():
+    data = request.json
+    sql_query = data.get("sql_query")
+    key_fields = data.get("key_fields", None)
+    display_type = data.get("display_type", "response_bar_chart")
+
+    try:
+        # 调用dws_connect执行SQL查询
+        sql_exec_dict = dws_connect(sql_query, key_fields, display_type)
+        
+        # 返回查询结果
+        return jsonify(sql_exec_dict)
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"status": 0, "error_message": str(e)})
 
 # 转发 /chat 请求到服务端
 @app.route("/chat", methods=["POST"])

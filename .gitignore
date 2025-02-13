@@ -4,4 +4,5 @@ Reports
 dist
 build
 my_run.spec
+client.spec
 Dockerfile

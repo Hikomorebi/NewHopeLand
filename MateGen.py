@@ -3,6 +3,7 @@ from openai import OpenAI
 import copy
 import time
 import traceback
+import requests
 from ChatMessage import ChatMessages
 from utils import (
     modify_prompt,
@@ -15,6 +16,8 @@ from utils import (
 )
 from get_date import get_enhanced_query
 import json
+
+CLIENT_URL = "http://113.54.153.102:45109" #实验室
 
 system_prompt_indicator_template = """
 {indicator_name}是一个需要计算的指标，它的字段名为{indicator_field_name}，计算规则为:
@@ -171,7 +174,14 @@ class MateGen:
             chat_dict["time"]+=f"第二阶段：获取SQL语句耗时: {elapsed_time_get_sql:.4f} 秒\n"
             # 执行SQL语句
             # status : 0表示sql执行报错,1表示正常返回结果，2表示查询结果为空
-            sql_exec_dict = dws_connect(sql_code, key_fields, display_type)
+            # sql_exec_dict = dws_connect(sql_code, key_fields, display_type)
+            # 调用客户端API执行SQL查询
+            response = requests.post(
+                f"{CLIENT_URL}/execute_sql", 
+                json={"sql_query": sql_code, "key_fields": key_fields, "display_type": display_type}
+            )
+            sql_exec_dict = response.json()    
+
             end_time_dws = time.time()
             elapsed_time_dws = end_time_dws - start_time_dws
             print("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
