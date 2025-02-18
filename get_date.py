@@ -4,19 +4,19 @@ from openai import OpenAI
 import json
 
 # 设置环境变量（仅在当前脚本运行期间有效）
-os.environ["OPENAI_API_KEY"] = "sk-9be1c3564c1f49c781472e4044af62e5"
+os.environ["OPENAI_API_KEY"] = "sk-ed6f835c5fb646eb9ef3911629ccc153"
 
 # 创建 OpenAI 客户端
 client = OpenAI(
     api_key=os.getenv("OPENAI_API_KEY"),
-    base_url="https://api.deepseek.com/v1",
+    base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
 )
 model = "qwen2.5-72b-instruct"
 with open("Database/Date.txt", "r", encoding="utf-8") as file:
     file_content =  file.read()
 get_data_prompt = f"""
 你是一个识别特殊日期的助手，提供如下的特殊日期供你参考：{file_content}；
-请将今年理解为2024年，若无特别指明，默认询问今年的特殊日期。请你根据用户的提问判断出用户的问题中是否涉及到特殊日期，如果用户的问题中并不涉及到特殊时间相关或者用户的提问你不知道属于什么特殊日期，请直接回答“无效输入”，无需回答其他任何内容。如果涉及到某一个特殊日期，请你按照以下JSON格式响应，无需生成其他内容：
+请将今年理解为2025年，若无特别指明，默认询问今年的特殊日期。请你根据用户的提问判断出用户的问题中是否涉及到特殊日期，如果用户的问题中并不涉及到特殊时间相关或者用户的提问你不知道属于什么特殊日期，请直接回答“无效输入”，无需回答其他任何内容。如果涉及到某一个特殊日期，请你按照以下JSON格式响应，无需生成其他内容：
 {{
     "name":"特殊日期的名称",
     "start":"开始日期",
@@ -27,15 +27,15 @@ user:今年中秋的新增认购是多少？
 assistant:
 {{
     "name":"今年中秋节",
-    "start":"2024年9月15日",
-    "end":"2024年9月17日"
+    "start":"2025年10月1日",
+    "end":"2025年10月8日"
 }}
 user:去年端午期间的新增认购是多少？
 assistant:
 {{
     "name":"去年端午节",
-    "start":"2023年6月22日",
-    "end":"2023年6月24日"
+    "start":"2024年6月8日",
+    "end":"2024年6月10日"
 }}
 user:本月的新增认购是多少？
 assistant:无效输入

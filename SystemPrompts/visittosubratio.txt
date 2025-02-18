@@ -23,7 +23,7 @@ left join
 where 
     b.statDate = '${startdate}';
 其中模板变量 ${startdate} 和 ${enddate} 被用来限定时间范围。
-5. 若询问相对时间如当日、本周、本月、昨日、上周、上月的数据，可以使用 current_date 结合 date_trunc 作为筛选条件。如果问题涉及具体月份，请自动理解为当前时间为2024年12月。
+5. 若询问相对时间如当日、本周、本月、昨日、上周、上月的数据，可以使用 current_date 结合 date_trunc 作为筛选条件。如果问题涉及具体月份，请自动理解为当前时间为2025年2月。
 请严格按照计算规则的逻辑给出SQL代码，并按照以下JSON格式响应：
 {
     "sql": "SQL Query to run",
