@@ -39,7 +39,7 @@ user:{user_question}
 """
 
 # 设置环境变量（仅在当前脚本运行期间有效）
-os.environ["OPENAI_API_KEY"] = "sk-46632b8571664330b45695ba5256c30e"
+os.environ["OPENAI_API_KEY"] = "sk-dpzicxnrtzafuwebtsbxyyxobprgoitzsfuybiqughxwouxf"
 
 with open("indicator_map.json", "r", encoding="utf-8") as file:
     indicator_map = json.load(file)
@@ -297,10 +297,10 @@ def get_translate_column_names(column_names):
     final_prompt = prompt_template.replace("<input>", str(need_translate_list))
     client = OpenAI(
         api_key=os.getenv("OPENAI_API_KEY"),
-        base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+        base_url="https://api.siliconflow.cn/v1/chat/completions",
     )
     response = client.chat.completions.create(
-        model="qwen-plus",
+        model="deepseek-ai/DeepSeek-V3",
         messages=[{"role": "user", "content": final_prompt}],
     )
     temp_dict = extract_json_from_response(response.choices[0].message.content)
@@ -389,9 +389,9 @@ def fuzzy_match_indicator(query, indicator_names):
     # 创建 OpenAI 客户端并设定模型
     client = OpenAI(
         api_key=os.getenv("OPENAI_API_KEY"),
-        base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+        base_url="https://api.siliconflow.cn/v1/chat/completions",
     )
-    model = "qwen-plus"
+    model = "deepseek-ai/DeepSeek-V3"
 
     # 构建模型提示
     indicator_names_str = "\n".join([f"- {indicator}" for indicator in indicator_names])

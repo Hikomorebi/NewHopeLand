@@ -4,14 +4,14 @@ import os
 from openai import OpenAI
 
 # 设置环境变量（仅在当前脚本运行期间有效）
-os.environ["OPENAI_API_KEY"] = "sk-46632b8571664330b45695ba5256c30e"
+os.environ["OPENAI_API_KEY"] = "sk-dpzicxnrtzafuwebtsbxyyxobprgoitzsfuybiqughxwouxf"
 
 # 创建 OpenAI 客户端
 client = OpenAI(
     api_key=os.getenv("OPENAI_API_KEY"),
-    base_url="https://dashscope.aliyuncs.com/compatible-mode/v1"
+    base_url="https://api.siliconflow.cn/v1/chat/completions"
 )
-model = 'qwen-plus'
+model = 'deepseek-ai/DeepSeek-V3'
 
 # 定义数据表
 tables_info = {
