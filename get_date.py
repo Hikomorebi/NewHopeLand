@@ -4,12 +4,12 @@ from openai import OpenAI
 import json
 
 # 设置环境变量（仅在当前脚本运行期间有效）
-os.environ["OPENAI_API_KEY"] = "sk-dpzicxnrtzafuwebtsbxyyxobprgoitzsfuybiqughxwouxf"
+os.environ["OPENAI_API_KEY"] = "sk-9be1c3564c1f49c781472e4044af62e5"
 
 # 创建 OpenAI 客户端
 client = OpenAI(
     api_key=os.getenv("OPENAI_API_KEY"),
-    base_url="https://api.siliconflow.cn/v1/chat/completions",
+    base_url="https://api.deepseek.com/v1",
 )
 model = "qwen2.5-72b-instruct"
 with open("Database/Date.txt", "r", encoding="utf-8") as file:

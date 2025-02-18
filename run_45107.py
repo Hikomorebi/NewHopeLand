@@ -17,9 +17,9 @@ from auto_select_tables import select_table_based_on_query
 
 app = Flask(__name__)
 
-OPENAI_API_KEY = "sk-dpzicxnrtzafuwebtsbxyyxobprgoitzsfuybiqughxwouxf"
-BASE_URL = "https://api.siliconflow.cn/v1/chat/completions"
-MODEL_NAME = "deepseek-ai/DeepSeek-V3"
+OPENAI_API_KEY = "sk-9be1c3564c1f49c781472e4044af62e5"
+BASE_URL = "https://api.deepseek.com/v1"
+MODEL_NAME = "deepseek-chat"
 
 with open("indicator_prompt.json", "r", encoding="utf-8") as file:
     indicator_prompt_dict = json.load(file)
