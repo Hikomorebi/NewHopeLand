@@ -39,7 +39,7 @@ user:{user_question}
 """
 
 # 设置环境变量（仅在当前脚本运行期间有效）
-os.environ["OPENAI_API_KEY"] = "sk-ed6f835c5fb646eb9ef3911629ccc153"
+os.environ["OPENAI_API_KEY"] = "sk-46632b8571664330b45695ba5256c30e"
 
 with open("indicator_map.json", "r", encoding="utf-8") as file:
     indicator_map = json.load(file)
@@ -300,7 +300,7 @@ def get_translate_column_names(column_names):
         base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
     )
     response = client.chat.completions.create(
-        model="deepseek-v3",
+        model="qwen-plus",
         messages=[{"role": "user", "content": final_prompt}],
     )
     temp_dict = extract_json_from_response(response.choices[0].message.content)
@@ -391,7 +391,7 @@ def fuzzy_match_indicator(query, indicator_names):
         api_key=os.getenv("OPENAI_API_KEY"),
         base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
     )
-    model = "deepseek-v3"
+    model = "qwen-plus"
 
     # 构建模型提示
     indicator_names_str = "\n".join([f"- {indicator}" for indicator in indicator_names])

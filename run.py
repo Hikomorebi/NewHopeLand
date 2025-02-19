@@ -17,9 +17,9 @@ from auto_select_tables import select_table_based_on_query
 
 app = Flask(__name__)
 
-OPENAI_API_KEY = "sk-ed6f835c5fb646eb9ef3911629ccc153"
+OPENAI_API_KEY = "sk-46632b8571664330b45695ba5256c30e"
 BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
-MODEL_NAME = "deepseek-v3"
+MODEL_NAME = "qwen-plus"
 
 with open("indicator_prompt.json", "r", encoding="utf-8") as file:
     indicator_prompt_dict = json.load(file)
